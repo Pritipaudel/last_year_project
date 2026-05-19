@@ -1,0 +1,16 @@
+node_modules/
+
+# Python virtual environments
+venv/
+.venv/
+backend/venv/
+
+# Python cache/artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Django local files
+*.sqlite3
+db.sqlite3
