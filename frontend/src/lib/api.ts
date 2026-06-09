@@ -1,0 +1,68 @@
+import axios from 'axios';
+
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api/',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Interceptor to attach JWT token to every request
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// Interceptor to handle unauthorized errors (token expired)
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            // Optional: window.location.href = '/login';
+        }
+        return Promise.reject(error);
+    }
+);
+
+export const authService = {
+    register: async (userData: any) => {
+        const { data } = await api.post('auth/register/', userData);
+        return data;
+    },
+    login: async (credentials: any) => {
+        const { data } = await api.post('auth/login/', credentials);
+        if (data.access) {
+            localStorage.setItem('token', data.access);
+        }
+        // Map backend snake_case to frontend camelCase
+        if (data.user) {
+            data.user = {
+                ...data.user,
+                name: data.user.first_name || data.user.username,
+                onboardingComplete: data.user.onboarding_complete
+            };
+        }
+        return data;
+    },
+    logout: () => {
+        localStorage.removeItem('token');
+    },
+    getMe: () => api.get('auth/me/'),
+};
+
+export const biometricService = {
+    saveProfile: (profileData: any) => api.patch('biometrics/profile/', profileData),
+    submitAssessment: (assessmentData: any) => {
+        // If data is FormData (for image uploads), axial headers are handled automatically
+        return api.post('biometrics/assess/', assessmentData);
+    },
+};
+
+export default api;

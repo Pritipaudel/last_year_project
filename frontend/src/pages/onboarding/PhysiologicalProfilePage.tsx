@@ -5,11 +5,15 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PageTransition } from '@/components/common/PageTransition';
 import { useOnboardingStore } from '@/store/onboardingStore';
+import { biometricService } from '@/lib/api';
+import { useUIStore } from '@/store/uiStore';
 
 export function PhysiologicalProfilePage() {
   const navigate = useNavigate();
   const { setFields } = useOnboardingStore();
+  const { addToast } = useUIStore();
   const [step, setStep] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     ageGroup: '',
     sex: '',
@@ -18,6 +22,7 @@ export function PhysiologicalProfilePage() {
   });
 
   const ageGroups = [
+// ... (omitted same content for brevity in instruction, but will include in replacement)
     { value: '18-25', label: '18-25', icon: GraduationCap },
     { value: '26-40', label: '26-40', icon: Briefcase },
     { value: '41-60', label: '41-60', icon: User },
@@ -39,22 +44,43 @@ export function PhysiologicalProfilePage() {
     return null;
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (step === 1 && formData.ageGroup) {
       setStep(2);
     } else if (step === 2 && formData.sex) {
       setStep(3);
     } else if (step === 3 && formData.height && formData.weight) {
-      // Save to onboarding store and navigate to camera permission
-      const bmi = calculateBMI();
-      setFields({
-        ageGroup: formData.ageGroup,
-        sex: formData.sex,
-        height: formData.height,
-        weight: formData.weight,
-        bmi,
-      });
-      navigate('/onboarding/camera-permission');
+      setIsSaving(true);
+      try {
+        const bmi = calculateBMI();
+        
+        // Persist to backend
+        await biometricService.saveProfile({
+          age_group: formData.ageGroup,
+          sex: formData.sex,
+          height: parseFloat(formData.height),
+          weight: parseFloat(formData.weight),
+          privacy_consent_timestamp: new Date().toISOString() // Core requirement
+        });
+
+        setFields({
+          ageGroup: formData.ageGroup,
+          sex: formData.sex,
+          height: formData.height,
+          weight: formData.weight,
+          bmi,
+        });
+
+        navigate('/onboarding/camera-permission');
+      } catch (error: any) {
+        addToast({
+          title: "Setup Error",
+          description: error.response?.data?.message || "Failed to save profile. Please try again.",
+          type: "error"
+        });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -231,7 +257,8 @@ export function PhysiologicalProfilePage() {
         <div className="mt-8 pt-4">
           <Button
             onClick={handleContinue}
-            disabled={!isStepComplete()}
+            disabled={!isStepComplete() || isSaving}
+            isLoading={isSaving}
             className="w-full h-14 text-lg"
           >
             {step === 3 ? 'Continue to Camera Setup' : 'Continue'}

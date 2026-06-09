@@ -1,10 +1,5 @@
 from django.contrib import admin
-from .models import UserProfile, Exercise, WorkoutSession, ExerciseLog, Doctor, Consultation
-
-@admin.register(UserProfile)
-class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'age_group', 'sex', 'bmi', 'onboarding_complete')
-    search_fields = ('user__username', 'age_group')
+from .models import Exercise, WorkoutSession, ExerciseLog, Doctor, Consultation
 
 @admin.register(Exercise)
 class ExerciseAdmin(admin.ModelAdmin):
