@@ -81,7 +81,7 @@ export function ExercisePreviewPage() {
         <Button 
           className="w-full" 
           size="lg"
-          onClick={() => navigate("/workout/active")}
+          onClick={() => navigate(`/workout/active?id=${exercise.id}`)}
         >
           Begin Exercise
         </Button>

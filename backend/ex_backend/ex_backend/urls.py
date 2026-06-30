@@ -23,4 +23,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/biometrics/', include('biometrics.urls')),
+    path('api/exercises/', include('exercise.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -19,7 +19,6 @@ export function BodyPhotoPage() {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const lastAssessmentRef = useRef<any>(null);
 
   const startAnalysis = async () => {
@@ -105,59 +104,6 @@ export function BodyPhotoPage() {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsAnalyzing(true);
-    await syncProfile();
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = async () => {
-        // We'll use a temporary canvas to run MediaPipe Pose on the static image
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = img.width;
-        tempCanvas.height = img.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx?.drawImage(img, 0, 0);
-
-        // MediaPipe Pose on static image
-        // @ts-ignore
-        const pose = new window.Pose({
-          locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-        });
-
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true });
-        pose.onResults(async (results: any) => {
-          if (results.poseLandmarks) {
-            const formData = new FormData();
-            formData.append('image', file); // Use original file
-            formData.append('raw_landmarks', JSON.stringify(results.poseLandmarks));
-            formData.append('joint_angles', JSON.stringify({ knee: 180 })); // Default or calculated
-            formData.append('deviations', JSON.stringify({})); // Placeholder
-
-            try {
-              if (videoRef.current) stopCamera(videoRef.current);
-              await biometricService.submitAssessment(formData);
-              setPhotoCaptured(true);
-              setField("photoTaken", true);
-              addToast({ title: "Analysis Success", description: "Uploaded photo analyzed and stored.", type: "success" });
-            } catch (err) {
-              addToast({ title: "Error", description: "Failed to analyze uploaded photo.", type: "error" });
-            } finally {
-              setIsAnalyzing(false);
-            }
-          }
-        });
-
-        await pose.send({ image: img });
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleRetake = () => {
     setPhotoCaptured(false);
@@ -218,10 +164,8 @@ export function BodyPhotoPage() {
             <Button onClick={() => navigate("/onboarding/goal-selection")} className="h-12 rounded-xl shadow-lg shadow-blue-200">Continue</Button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
-            <Button onClick={handleCapture} className="h-12 rounded-xl bg-primary hover:bg-primary-hover shadow-lg shadow-blue-300" isLoading={isAnalyzing}>Capture Pose</Button>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-12 rounded-xl" isLoading={isAnalyzing}>Upload Photo</Button>
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+          <div className="w-full">
+            <Button onClick={handleCapture} className="w-full h-12 rounded-xl bg-primary hover:bg-primary-hover shadow-lg shadow-blue-300" isLoading={isAnalyzing}>Capture Pose</Button>
           </div>
         )}
 

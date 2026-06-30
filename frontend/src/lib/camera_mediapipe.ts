@@ -3,6 +3,7 @@
  */
 
 let poseInstance: any = null;
+let cameraInstance: any = null;
 
 export async function initializeCamera(videoElement: HTMLVideoElement): Promise<boolean> {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -49,10 +50,32 @@ export async function initializeCamera(videoElement: HTMLVideoElement): Promise<
 }
 
 export function stopCamera(videoElement: HTMLVideoElement) {
-    const stream = videoElement.srcObject as MediaStream;
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        videoElement.srcObject = null;
+    console.log("🛑 Closing camera and cleaning up MediaPipe...");
+    
+    if (cameraInstance) {
+        try {
+            cameraInstance.stop();
+        } catch (e) {
+            console.error("Error stopping MediaPipe camera:", e);
+        }
+        cameraInstance = null;
+    }
+
+    if (poseInstance) {
+        try {
+            poseInstance.close();
+        } catch (e) {
+            console.error("Error closing Pose instance:", e);
+        }
+        poseInstance = null;
+    }
+
+    if (videoElement && videoElement.srcObject) {
+        const stream = videoElement.srcObject as MediaStream;
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            videoElement.srcObject = null;
+        }
     }
 }
 
@@ -169,7 +192,7 @@ export function processPose(
     // @ts-ignore
     if (window.Camera) {
         // @ts-ignore
-        const camera = new window.Camera(videoElement, {
+        cameraInstance = new window.Camera(videoElement, {
             onFrame: async () => {
                 try {
                     await poseInstance.send({ image: videoElement });
@@ -180,7 +203,7 @@ export function processPose(
             width: 640,
             height: 480
         });
-        camera.start().then(() => {
+        cameraInstance.start().then(() => {
             console.log("✅ MediaPipe Camera utility started");
         }).catch((err: any) => {
             console.error("❌ Error starting MediaPipe Camera utility:", err);

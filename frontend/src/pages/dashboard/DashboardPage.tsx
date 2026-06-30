@@ -8,16 +8,38 @@ import { Header } from "@/components/layout/Header";
 import { PageTransition } from "@/components/common/PageTransition";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useAuth } from "@/hooks/useAuth";
+import { exerciseService, Exercise, WorkoutSession } from "@/services/exerciseService";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [recentSessions, setRecentSessions] = useState<WorkoutSession[]>([]);
+  const [todayExercise, setTodayExercise] = useState<Exercise | null>(null);
 
   useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    const fetchData = async () => {
+      try {
+        const [exData, sessionData] = await Promise.all([
+          exerciseService.getExercises(),
+          exerciseService.getSessions(),
+        ]);
+        
+        setExercises(exData);
+        setRecentSessions(sessionData);
+        
+        // Pick Squat as "Today's Plan" if available, otherwise first exercise
+        const squat = exData.find(ex => ex.name.toLowerCase().includes('squat'));
+        setTodayExercise(squat || exData[0] || null);
+        
+      } catch (error) {
+        console.error("Failed to load dashboard data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   if (isLoading) {
@@ -36,38 +58,43 @@ export function DashboardPage() {
           <p className="text-muted-foreground">Ready for your workout today?</p>
         </div>
 
-        <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Badge variant="secondary" className="mb-2">Today's Plan</Badge>
-                <h3 className="text-xl font-bold">Full Body Strength</h3>
-                <p className="text-sm text-muted-foreground mt-1">45 mins • Intermediate • 5 exercises</p>
+        {todayExercise ? (
+          <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <Badge variant="secondary" className="mb-2">Today's Plan</Badge>
+                  <h3 className="text-xl font-bold">{todayExercise.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {todayExercise.muscleGroup} • {todayExercise.difficulty}
+                  </p>
+                </div>
+                <div className="hidden sm:flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 text-primary">
+                  <Activity className="h-8 w-8" />
+                </div>
               </div>
-              <div className="hidden sm:flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 text-primary">
-                <Activity className="h-8 w-8" />
-              </div>
-            </div>
-            <Button 
-              className="w-full sm:w-auto" 
-              leftIcon={<Play className="h-4 w-4" />}
-              onClick={() => navigate("/exercises")}
-            >
-              Start Workout
-            </Button>
-          </CardContent>
-        </Card>
+              <Button 
+                className="w-full sm:w-auto" 
+                leftIcon={<Play className="h-4 w-4" />}
+                onClick={() => navigate(`/exercises/${todayExercise.id}`)}
+              >
+                Start Workout
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="p-8 text-center text-muted-foreground">
+            Complete your profile to see personalized workouts!
+          </Card>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Weekly Goal</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Workouts</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3<span className="text-sm text-muted-foreground font-normal">/5 days</span></div>
-              <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
-                <div className="h-full bg-primary rounded-full w-[60%]" />
-              </div>
+              <div className="text-2xl font-bold">{recentSessions.length}</div>
             </CardContent>
           </Card>
           
@@ -76,7 +103,9 @@ export function DashboardPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Streak</CardTitle>
             </CardHeader>
             <CardContent className="flex items-center space-x-2">
-              <div className="text-2xl font-bold text-emerald-600">4</div>
+              <div className="text-2xl font-bold text-emerald-600">
+                {recentSessions.length > 0 ? '1' : '0'}
+              </div>
               <span className="text-sm text-muted-foreground">days</span>
             </CardContent>
           </Card>
@@ -89,24 +118,32 @@ export function DashboardPage() {
           </div>
           
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} variant="default" className="py-2">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <Calendar className="h-5 w-5 text-muted-foreground" />
+            {recentSessions.length > 0 ? (
+              recentSessions.map((session) => (
+                <Card key={session.id} variant="default" className="py-2">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{session.exercise_name || session.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(session.created_at).toLocaleDateString()} • {session.duration_minutes} mins
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Upper Body Focus</p>
-                      <p className="text-xs text-muted-foreground">Yesterday • 30 mins</p>
+                    <div className="text-sm font-medium text-primary">
+                      {session.reps} reps
                     </div>
-                  </div>
-                  <div className="text-sm font-medium text-primary">
-                    320 kcal
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed text-sm">
+                No recent workouts found. Start your first session today!
+              </div>
+            )}
           </div>
         </div>
       </div>

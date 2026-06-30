@@ -5,6 +5,12 @@ from django.contrib.auth.models import User
 class Exercise(models.Model):
     """
     Library of available exercises (Push-ups, Squats, etc.)
+
+    Personalization fields:
+    - goal_tags: list of goals this exercise serves, e.g. ["weight_loss", "weight_gain", "general"]
+    - angle_ranges: per-age-band MediaPipe knee interior-angle thresholds for rep counting
+    - rep_config: per-age-band sets/reps/rest targets
+    - voice_cues: per-age-band, per-error cue text strings for Web Speech API
     """
     DIFFICULTY_CHOICES = [
         ('Beginner', 'Beginner'),
@@ -12,11 +18,50 @@ class Exercise(models.Model):
         ('Advanced', 'Advanced'),
     ]
 
+    GOAL_CHOICES = ['weight_loss', 'weight_gain', 'general']
+
     name = models.CharField(max_length=255, unique=True)
-    muscle_group = models.CharField(max_length=100, db_index=True) # e.g., Chest, Back, Legs
+    muscle_group = models.CharField(max_length=100, db_index=True)
     difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES)
     image_url = models.URLField()
     description = models.TextField(blank=True)
+
+    # --- Personalization fields ---
+
+    # Which goals this exercise is relevant for.
+    # Values must be from: ["weight_loss", "weight_gain", "general"]
+    goal_tags = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='e.g. ["weight_loss", "weight_gain", "general"]'
+    )
+
+    # Per-age-band knee angle thresholds (MediaPipe interior angle, degrees).
+    # Keys: "18-25", "26-40", "41-60", "60+"
+    # Each band: {bottom_min, bottom_max, standing_threshold, too_deep_threshold}
+    angle_ranges = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Per-age-band MediaPipe knee angle thresholds for rep counting'
+    )
+
+    # Per-age-band rep/set/rest prescriptions.
+    # Keys: "18-25", "26-40", "41-60", "60+"
+    # Each band: {sets, reps, rest_seconds}
+    rep_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Per-age-band sets, reps, and rest period in seconds'
+    )
+
+    # Per-age-band voice cue text for each error type.
+    # Keys: "18-25", "26-40", "41-60", "60+"
+    # Each band: {insufficient_depth, excessive_depth, forward_lean, knee_tracking}
+    voice_cues = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Per-age-band cue text strings keyed by error type'
+    )
 
     class Meta:
         ordering = ['name']

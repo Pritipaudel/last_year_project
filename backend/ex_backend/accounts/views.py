@@ -24,27 +24,38 @@ class RegisterView(generics.CreateAPIView):
 
 
 class LoginView(TokenObtainPairView):
+    """
+    POST /api/auth/login/
+    Customizes simplejwt login to return user data and handle email lookup.
+    """
     permission_classes = (AllowAny,)
     
     def post(self, request, *args, **kwargs):
+        # 1. Normalize username/email to lowercase
+        email_or_username = request.data.get('username', '').strip().lower()
+        
+        # 2. Try to find the user to ensure we can handle case-insensitive lookup
+        # SimpleJWT is strict, so we'll normalize the username in the request if needed
+        try:
+            user = User.objects.get(email__iexact=email_or_username)
+            request.data['username'] = user.username # Ensure simplejwt uses the exact DB username
+        except User.DoesNotExist:
+            try:
+                user = User.objects.get(username__iexact=email_or_username)
+                request.data['username'] = user.username
+            except User.DoesNotExist:
+                return Response(
+                    {"detail": "No account found with this email/username."},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
         try:
             response = super().post(request, *args, **kwargs)
             if response.status_code == 200:
-                user = User.objects.get(username=request.data.get('username'))
                 response.data['user'] = UserSerializer(user).data
             return response
-        except (InvalidToken, TokenError) as e:
+        except Exception:
             return Response(
-                {"detail": "Invalid credentials. Please check your email and password."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        except User.DoesNotExist:
-            return Response(
-                {"detail": "Invalid credentials. Please check your email and password."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        except Exception as e:
-            return Response(
-                {"detail": "Invalid credentials. Please check your email and password."},
+                {"detail": "Incorrect password. Please try again."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
