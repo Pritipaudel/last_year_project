@@ -47,8 +47,7 @@ export interface Exercise {
 }
 
 export interface FormError {
-  error_type: "insufficient_depth" | "excessive_depth" | "forward_lean" | "knee_tracking";
-  count: number;
+  error_type: string;
   timestamp?: string;
 }
 

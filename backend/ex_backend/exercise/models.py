@@ -78,12 +78,12 @@ class WorkoutSession(models.Model):
     workout_type = models.CharField(max_length=50, db_index=True) # e.g., Strength, Cardio, Core, Mobility
     duration_minutes = models.PositiveIntegerField(default=0)
     calories_burned = models.PositiveIntegerField(default=0)
-    date = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     
     metadata = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
-        return f"{self.title} on {self.date.strftime('%Y-%m-%d')}"
+        return f"{self.title} on {self.created_at.strftime('%Y-%m-%d')}"
 
 class ExerciseLog(models.Model):
     """

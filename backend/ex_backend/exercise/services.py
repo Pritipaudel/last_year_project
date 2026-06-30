@@ -52,7 +52,7 @@ def _safe_band(profile) -> str:
     return profile.age_group or '26-40'
 
 
-def _personalize(exercise: Exercise, band: str) -> dict:
+def _personalize(user, exercise: Exercise, band: str) -> dict:
     """
     Given a raw Exercise ORM object and an age band, return a dict containing
     only the data the frontend needs for this specific user's live session:
@@ -72,29 +72,31 @@ def _personalize(exercise: Exercise, band: str) -> dict:
         'min_bottom_frames': 3,
     }
     default_rep = {'sets': 3, 'reps': 10, 'rest_seconds': 60}
+    
+    # Variety in cues for less repetitive feedback
     default_cues = {
-        'insufficient_depth': 'Try to lower a bit more.',
-        'excessive_depth': 'You are deep enough — start rising.',
-        'forward_lean': 'Keep your chest up and back tall.',
-        'knee_tracking': 'Guide your knees outward over your toes.',
+        'insufficient_depth': 'Lower your hips a bit more to hit parallel.',
+        'excessive_depth': 'You have hit peak depth, start rising.',
+        'forward_lean': 'Keep your chest up and look forward.',
+        'knee_tracking': 'Keep your knees aligned over your toes.',
     }
 
+    # If the user has a specific age band, use those values
     band_angles = exercise.angle_ranges.get(band, default_angles)
-    # Always include min_bottom_frames (noise guard) even if DB omits it
     band_angles.setdefault('min_bottom_frames', 3)
 
     band_rep = exercise.rep_config.get(band, default_rep)
 
+    # Fetch cues and allow for future array-based randomisation if needed
     band_cues_raw = exercise.voice_cues.get(band, default_cues)
-    # Return cues in priority order so the frontend can just pick [0] when
-    # multiple errors fire simultaneously.
+    
     priority_order = [
         'insufficient_depth',
         'excessive_depth',
         'forward_lean',
         'knee_tracking',
     ]
-    band_cues_prioritised = {k: band_cues_raw.get(k, default_cues[k]) for k in priority_order}
+    band_cues_prioritised = {k: band_cues_raw.get(k, default_cues.get(k, '')) for k in priority_order}
 
     return {
         'id': exercise.id,
@@ -104,14 +106,13 @@ def _personalize(exercise: Exercise, band: str) -> dict:
         'image_url': exercise.image_url,
         'description': exercise.description,
         'goal_tags': exercise.goal_tags,
-        # Everything the frontend needs for the live session — no further
-        # backend calls required once this payload lands.
         'personalization': {
             'age_band': band,
+            'user_name': getattr(user, 'first_name', user.username),
             'angle_ranges': band_angles,
             'rep_config': band_rep,
             'voice_cues': band_cues_prioritised,
-            'cue_cooldown_seconds': 8,   # frontend enforces this
+            'cue_cooldown_seconds': 6, 
         },
     }
 
@@ -141,7 +142,7 @@ def get_personalized_exercises(user) -> list[dict]:
     # This correctly matches ["weight_loss", "general"] when filtering for "weight_loss".
     exercises = Exercise.objects.filter(goal_tags__contains=[goal_tag])
 
-    return [_personalize(ex, band) for ex in exercises]
+    return [_personalize(user, ex, band) for ex in exercises]
 
 
 def get_personalized_exercise_detail(user, exercise_id: int) -> dict | None:
@@ -162,4 +163,4 @@ def get_personalized_exercise_detail(user, exercise_id: int) -> dict | None:
     except Exercise.DoesNotExist:
         return None
 
-    return _personalize(exercise, band)
+    return _personalize(user, exercise, band)

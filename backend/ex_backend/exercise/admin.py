@@ -13,8 +13,8 @@ class ExerciseLogInline(admin.TabularInline):
 
 @admin.register(WorkoutSession)
 class WorkoutSessionAdmin(admin.ModelAdmin):
-    list_display = ('title', 'user', 'workout_type', 'duration_minutes', 'date')
-    list_filter = ('workout_type', 'date')
+    list_display = ('title', 'user', 'workout_type', 'duration_minutes', 'created_at')
+    list_filter = ('workout_type', 'created_at')
     inlines = [ExerciseLogInline]
 
 @admin.register(Doctor)

@@ -111,7 +111,7 @@ export function HistoryPage() {
                                 ) : (
                                   <>
                                     <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                                    <span className="text-[10px] font-bold text-white">Focus</span>
+                                    <span className="text-[10px] font-bold text-white">Perfect</span>
                                   </>
                                 )}
                               </div>
@@ -119,11 +119,19 @@ export function HistoryPage() {
                           </div>
 
                           {hasErrors && (
-                            <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-dashed border-neutral-100 dark:border-white/5 lg:hidden">
-                               <span className="text-[9px] font-bold text-neutral-400">Notes:</span>
-                               <span className="text-[9px] text-neutral-500 italic">
-                                  {errors.length} form corrections suggested during session.
-                               </span>
+                            <div className="mt-4 pt-4 border-t border-dashed border-neutral-100 dark:border-neutral-800">
+                               <span className="text-[9px] font-bold text-neutral-400 block mb-2 uppercase tracking-wider">Form Corrections:</span>
+                               <div className="flex flex-wrap gap-2">
+                                 {Array.from(new Set(errors.map((e: any) => e.error_type))).map((errorType: any, idx: number) => {
+                                   const formattedError = String(errorType).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                   const count = errors.filter((e: any) => e.error_type === errorType).length;
+                                   return (
+                                     <Badge key={idx} variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px] font-bold">
+                                       {formattedError} ({count}x)
+                                     </Badge>
+                                   );
+                                 })}
+                               </div>
                             </div>
                           )}
                         </div>
