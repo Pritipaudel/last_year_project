@@ -39,11 +39,11 @@ class WorkoutSessionSerializer(serializers.ModelSerializer):
         ]
 
     def get_exercise_name(self, obj):
-        first_log = obj.exerciselog_set.first()
+        first_log = obj.exercise_logs.first()
         return first_log.exercise.name if first_log else obj.title
 
     def get_reps(self, obj):
-        first_log = obj.exerciselog_set.first()
+        first_log = obj.exercise_logs.first()
         return first_log.reps if first_log else 0
 
 

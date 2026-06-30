@@ -26,21 +26,16 @@ export function ActiveWorkoutPage() {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isPoseReady, setIsPoseReady] = useState(false);
   
-  // Advanced tracking state
-  const repState = useRef<'up' | 'down'>('up');
+  const repState = useRef<'ready' | 'descending' | 'bottom' | 'ascending'>('ready');
   const lastCueTime = useRef(0);
-  const CUE_COOLDOWN = 4000; // Increased cooldown to 4s to prevent repetition
+  const CUE_COOLDOWN = 5000; // 5 seconds to prevent spam
   
-  const sessionErrors = useRef<{type: string, timestamp: number}[]>([]);
+  const sessionErrors = useRef<{error_type: string, timestamp: string}[]>([]);
   const currentRepErrors = useRef<string[]>([]);
   
-  // Visibility calibration
   const visibleFrameCount = useRef(0);
-  const REQUIRED_VISIBLE_FRAMES = 10; 
   const [isFullyVisible, setIsFullyVisible] = useState(false);
   const hasAnnouncedStart = useRef(false);
-
-  // Depth tracking to avoid premature "go lower"
   const minAngleInCurrentRep = useRef(180);
 
   useEffect(() => {
@@ -61,7 +56,7 @@ export function ActiveWorkoutPage() {
     lastCueTime.current = Date.now();
 
     if (errorType) {
-      sessionErrors.current.push({ type: errorType, timestamp: seconds });
+      sessionErrors.current.push({ error_type: errorType, timestamp: seconds.toString() });
       if (!currentRepErrors.current.includes(errorType)) {
         currentRepErrors.current.push(errorType);
       }
@@ -109,74 +104,91 @@ export function ActiveWorkoutPage() {
 
     processPose(videoRef.current, canvasRef.current, (results) => {
       const landmarks = results.landmarks;
-      const angle = results.knee_angle || results.kneeAngleRight;
+      const angle = results.knee_angle;
       const spineAngle = results.spine_angle;
       const thresholds = exercise.personalization.angle_ranges;
       const cues = exercise.personalization.voice_cues;
 
       if (!landmarks) return;
 
-      // 1. ROBUST VISIBILITY CHECK
-      // Must see Hips(23,24), Knees(25,26), and Ankles(27,28) with high confidence
       const keyPoints = [23, 24, 25, 26, 27, 28];
-      const allVisible = keyPoints.every(idx => landmarks[idx] && landmarks[idx].visibility > 0.75);
+      const allVisible = keyPoints.every(idx => landmarks[idx] && landmarks[idx].visibility > 0.7);
 
       if (allVisible) {
         visibleFrameCount.current += 1;
       } else {
         visibleFrameCount.current = 0;
-        if (isFullyVisible) setIsFullyVisible(false);
       }
 
-      // Only announce start after 10 clean frames of full body visibility
-      if (visibleFrameCount.current >= REQUIRED_VISIBLE_FRAMES && !hasAnnouncedStart.current) {
+      if (visibleFrameCount.current >= 12 && !hasAnnouncedStart.current) {
         hasAnnouncedStart.current = true;
         setIsFullyVisible(true);
-        speak("I can see you clearly now. Start your squats!", true);
+        speak("I see you. Let's start! Go down for your first squat.", true);
         return;
       }
 
       if (!isFullyVisible || isPaused) return;
 
-      // 2. INTELLIGENT REPS & FEEDBACK
       if (angle !== null) {
-        // Going down phase
-        if (repState.current === 'up' && angle < (thresholds.standing_threshold - 30)) {
-          repState.current = 'down';
+        // ENHANCED STATE MACHINE TO PREVENT DOUBLE COUNTING
+        
+        // 1. STARTING DESCENDING
+        if (repState.current === 'ready' && angle < (thresholds.standing_threshold - 35)) {
+          repState.current = 'descending';
           currentRepErrors.current = [];
           minAngleInCurrentRep.current = angle;
         } 
         
-        if (repState.current === 'down') {
-          // Track the deepest point reached in this rep
+        // 2. MONITORING BOTTOM
+        if (repState.current === 'descending') {
           if (angle < minAngleInCurrentRep.current) {
             minAngleInCurrentRep.current = angle;
           }
 
-          // INTELLIGENT DEPTH CUE
-          // Only tell them to go deeper if they stop descending (angle starts increasing)
-          // but they are still above the bottom_max target.
-          const isAscending = angle > minAngleInCurrentRep.current + 5; 
-          
-          if (isAscending && minAngleInCurrentRep.current > (thresholds.bottom_max + 10)) {
-            speak(cues.insufficient_depth || "Lower your hips a bit more.", false, 'insufficient_depth');
-          } else if (angle < thresholds.too_deep_threshold) {
-             speak(cues.excessive_depth || "Don't go too deep.", false, 'excessive_depth');
+          // If they hit target depth
+          if (angle < thresholds.bottom_max) {
+             repState.current = 'bottom';
           }
-          
-          // Posture check
-          if (spineAngle !== null && spineAngle < 110) {
-            speak(cues.forward_lean || "Keep your chest up.", false, 'forward_lean');
+
+          // Premature ascending check
+          if (angle > minAngleInCurrentRep.current + 10) {
+             // They started moving up before reaching peak depth
+             if (minAngleInCurrentRep.current > thresholds.bottom_max + 15) {
+                speak(cues.insufficient_depth || "Go lower next time.", false, 'insufficient_depth');
+             }
+             repState.current = 'ascending';
           }
         }
 
-        // Completing rep
-        if (repState.current === 'down' && angle > (thresholds.standing_threshold - 15)) {
-          repState.current = 'up';
+        // 3. AT BOTTOM
+        if (repState.current === 'bottom') {
+            if (angle < minAngleInCurrentRep.current) minAngleInCurrentRep.current = angle;
+            
+            // Too deep check
+            if (angle < thresholds.too_deep_threshold) {
+                speak(cues.excessive_depth || "A bit too deep.", false, 'excessive_depth');
+            }
+
+            // Moving up now
+            if (angle > minAngleInCurrentRep.current + 8) {
+                repState.current = 'ascending';
+            }
+        }
+
+        // 4. COMPLETING
+        if (repState.current === 'ascending' && angle > (thresholds.standing_threshold - 15)) {
+          repState.current = 'ready';
           setReps(r => r + 1);
           if (currentRepErrors.current.length === 0) {
             speak("Perfect!", true);
           }
+        }
+
+        // FORM CHECK (ALWAYS ACTIVE)
+        if (repState.current !== 'ready') {
+            if (spineAngle !== null && spineAngle < 110) {
+                speak(cues.forward_lean || "Chest up.", false, 'forward_lean');
+            }
         }
       }
     });
@@ -217,7 +229,7 @@ export function ActiveWorkoutPage() {
 
   return (
     <PageTransition variant="fade" className="fixed inset-0 z-[100] flex flex-col bg-black text-white overflow-hidden">
-      {/* COMPACT HUD */}
+      {/* HUD */}
       {isCameraActive && (
         <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between px-6 pt-12 pb-6 bg-gradient-to-b from-black/80 to-transparent">
           <div className="flex items-center gap-3">
@@ -229,20 +241,20 @@ export function ActiveWorkoutPage() {
               {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
             </Button>
             <div className="flex flex-col">
-              <span className="text-[8px] uppercase font-bold text-white/40 tracking-[0.2em]">{isFullyVisible ? 'READY' : 'POSITIONING'}</span>
-              <span className="font-bold text-xs uppercase">{exercise?.name}</span>
+              <span className="text-[8px] uppercase font-black text-white/40 tracking-[0.2em]">{isFullyVisible ? 'TRACKING' : 'CALIBRATING'}</span>
+              <span className="font-black text-xs uppercase italic tracking-wider">{exercise?.name}</span>
             </div>
           </div>
           
           <div className="flex gap-2">
-            <div className="flex items-center gap-4 px-4 py-2 bg-black/60 rounded-xl border border-white/5 backdrop-blur-3xl">
-              <div className="flex flex-col items-center">
-                <span className="text-[8px] uppercase font-bold text-primary">Reps</span>
+            <div className="flex items-center gap-4 px-5 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+               <div className="flex flex-col items-center">
+                <span className="text-[8px] uppercase font-black text-primary">Reps</span>
                 <span className="text-xl font-black">{reps}</span>
               </div>
               <div className="w-[1px] h-4 bg-white/10" />
               <div className="flex flex-col items-center">
-                <span className="text-[8px] uppercase font-bold text-white/30">Time</span>
+                <span className="text-[8px] uppercase font-black text-white/40">Time</span>
                 <span className="text-xl font-mono">{formatTime(seconds)}</span>
               </div>
             </div>
@@ -255,28 +267,27 @@ export function ActiveWorkoutPage() {
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none" playsInline />
         
         {!isCameraActive ? (
-          <div className="text-center p-8 space-y-12">
-            <div className="h-28 w-28 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary shadow-2xl shadow-primary/30">
-              <CameraIcon size={40} />
+          <div className="text-center p-8 space-y-12 animate-in fade-in zoom-in duration-500">
+            <div className="h-28 w-28 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary shadow-2xl relative">
+               <div className="absolute inset-0 rounded-full animate-ping bg-primary/10 opacity-30" />
+               <CameraIcon size={40} className="relative z-10" />
             </div>
-            <div className="space-y-3">
-              <h3 className="text-3xl font-black tracking-tighter uppercase italic">Ready?</h3>
-              <p className="text-neutral-500 text-sm">Full body must be visible</p>
+            <div className="space-y-4">
+              <h3 className="text-4xl font-black tracking-tighter uppercase italic text-white">Coach Mode</h3>
+              <p className="text-neutral-500 text-sm font-medium">Stand back so I can see your form</p>
             </div>
-            <Button onClick={() => setIsCameraActive(true)} size="lg" className="rounded-full px-16 h-20 text-xl font-black shadow-2xl shadow-primary/20">
-              Go Live
+            <Button onClick={() => setIsCameraActive(true)} size="lg" className="rounded-full px-16 h-20 text-xl font-black shadow-2xl shadow-primary/20 transition-all active:scale-95 bg-primary hover:bg-primary/90">
+              Start Life Session
             </Button>
           </div>
         ) : (
           <div className="w-full h-full touch-none relative">
             <canvas ref={canvasRef} className="w-full h-full object-cover" width={640} height={480} />
-            
-            {/* Calibration Warning */}
             {!isFullyVisible && (
               <div className="absolute inset-x-0 bottom-32 flex justify-center z-40 px-6">
-                <div className="bg-black/80 border border-white/10 px-8 py-4 rounded-2xl flex items-center gap-4 shadow-2xl backdrop-blur-xl">
-                  <LoadingSpinner size="sm" />
-                  <p className="text-sm font-bold text-white uppercase tracking-widest animate-pulse">Waiting for full body view...</p>
+                <div className="bg-black/80 border border-primary/20 px-10 py-4 rounded-full flex items-center gap-4 backdrop-blur-xl shadow-2xl shadow-primary/10">
+                   <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                   <p className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Synching Physiology...</p>
                 </div>
               </div>
             )}
@@ -284,19 +295,19 @@ export function ActiveWorkoutPage() {
         )}
       </div>
 
-      {/* FLOATING CONTROLS */}
+      {/* CONTROLS */}
       {isCameraActive && (
-        <div className="absolute bottom-10 left-0 right-0 z-[110] flex items-center justify-center gap-8 pointer-events-none">
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-full border-2 border-white/10 bg-black/20 pointer-events-auto backdrop-blur-xl" onClick={() => navigate(-1)}>
-            <SkipForward size={20} className="text-white/40" />
+        <div className="absolute bottom-12 left-0 right-0 z-[110] flex items-center justify-center gap-10 pointer-events-none">
+          <Button variant="outline" size="icon" className="h-14 w-14 rounded-full border border-white/10 bg-black/40 text-white/50 pointer-events-auto backdrop-blur-md transition-all hover:bg-black/60" onClick={() => navigate("/dashboard")}>
+            <SkipForward size={20} />
           </Button>
 
-          <Button size="icon" className="h-20 w-20 rounded-full shadow-2xl bg-primary pointer-events-auto" onClick={() => setIsPaused(!isPaused)}>
+          <Button size="icon" className="h-20 w-20 rounded-full shadow-2xl shadow-primary/30 bg-primary hover:bg-primary/90 pointer-events-auto transition-transform active:scale-90" onClick={() => setIsPaused(!isPaused)}>
             {isPaused ? <Play size={32} className="ml-1" /> : <Pause size={32} />}
           </Button>
 
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-full border-2 border-white/10 bg-black/20 pointer-events-auto" onClick={handleFinish}>
-            <Square size={20} className="text-destructive font-bold" />
+          <Button variant="outline" size="icon" className="h-14 w-14 rounded-full border border-white/10 bg-black/40 text-white/50 pointer-events-auto transition-all hover:bg-black/60" onClick={handleFinish}>
+            <Square size={20} className="text-destructive font-black" />
           </Button>
         </div>
       )}
