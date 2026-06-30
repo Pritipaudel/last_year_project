@@ -1,0 +1,68 @@
+PROJECT SETUP & REQUIREMENTS GUIDE
+==================================
+This file provides instructions for team members to set up, install, and run the Exercise Tracker project locally.
+
+1. PREREQUISITES
+----------------
+Before getting started, make sure you have the following installed on your system:
+- Python (3.9 or higher): To run the Django backend.
+- Node.js (18 or higher) and npm: To run the React/Vite frontend.
+- PostgreSQL: The database being used (psycopg2-binary is in our requirements).
+
+2. DATABASE SETUP
+----------------
+1. Open PostgreSQL pgAdmin or your terminal.
+2. Create a new database for the project (check backend/.env or backend settings for the exact DB name).
+3. Ensure your PostgreSQL credentials (username/password) match the backend configurations.
+
+3. BACKEND SETUP (Django)
+-------------------------
+1. Open your terminal and navigate to the backend directory:
+   cd backend
+
+2. Create a virtual environment to keep Python dependencies isolated:
+   python -m venv venv
+
+3. Activate the virtual environment:
+   - On Windows: venv\Scripts\activate
+   - On Mac/Linux: source venv/bin/activate
+
+4. Install the backend dependencies:
+   pip install -r requirements.txt
+   (Note: Dependencies include Django, djangorestframework, simplejwt, psycopg2-binary, pillow, etc.)
+
+5. Navigate to the inner project directory where manage.py is located:
+   cd ex_backend
+
+6. Run database migrations to set up your tables:
+   python manage.py migrate
+
+7. (Optional but recommended) Create a superuser for the admin panel:
+   python manage.py createsuperuser
+
+8. Start the backend server:
+   python manage.py runserver
+
+   The backend will now be running on http://127.0.0.1:8000/
+
+
+4. FRONTEND SETUP (React + Vite)
+--------------------------------
+1. Open a new terminal window (keep the backend server running) and navigate to the frontend directory:
+   cd frontend
+
+2. Install the required Node.js packages (Zustand, TailwindCSS, React Hook Form, Axios, Framer Motion, etc.):
+   npm install
+
+3. Start the frontend development server:
+   npm run dev
+
+   The frontend will typically run on http://localhost:5173/ (Check the terminal output for the exact URL).
+
+
+5. HOW TO USE / TEST
+--------------------
+- The Django admin panel can be accessed at http://127.0.0.1:8000/admin/
+- API endpoints are available on the backend server.
+- The web interface is available on the frontend Vite server.
+- Ensure both servers (Django and Vite) are running simultaneously when working on the project.
