@@ -25,14 +25,23 @@ export function ActiveWorkoutPage() {
   
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isPoseReady, setIsPoseReady] = useState(false);
-  const [isUserInView, setIsUserInView] = useState(false);
-
+  
+  // Advanced tracking state
   const repState = useRef<'up' | 'down'>('up');
   const lastCueTime = useRef(0);
-  const CUE_COOLDOWN = 3000;
+  const CUE_COOLDOWN = 4000; // Increased cooldown to 4s to prevent repetition
   
-  // Track errors in current rep to give "Correct" feedback
+  const sessionErrors = useRef<{type: string, timestamp: number}[]>([]);
   const currentRepErrors = useRef<string[]>([]);
+  
+  // Visibility calibration
+  const visibleFrameCount = useRef(0);
+  const REQUIRED_VISIBLE_FRAMES = 10; 
+  const [isFullyVisible, setIsFullyVisible] = useState(false);
+  const hasAnnouncedStart = useRef(false);
+
+  // Depth tracking to avoid premature "go lower"
+  const minAngleInCurrentRep = useRef(180);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -41,14 +50,22 @@ export function ActiveWorkoutPage() {
     };
   }, []);
 
-  const speak = (text: string, force = false) => {
+  const speak = (text: string, force = false, errorType?: string) => {
     if (isMuted) return;
     if (!force && Date.now() - lastCueTime.current < CUE_COOLDOWN) return;
+    
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     window.speechSynthesis.speak(utterance);
     lastCueTime.current = Date.now();
+
+    if (errorType) {
+      sessionErrors.current.push({ type: errorType, timestamp: seconds });
+      if (!currentRepErrors.current.includes(errorType)) {
+        currentRepErrors.current.push(errorType);
+      }
+    }
   };
 
   useEffect(() => {
@@ -72,10 +89,10 @@ export function ActiveWorkoutPage() {
   }, [exerciseId]);
 
   useEffect(() => {
-    if (isPaused || !isPoseReady || !isUserInView) return;
+    if (isPaused || !isPoseReady || !isFullyVisible) return;
     const interval = setInterval(() => setSeconds(s => s + 1), 1000);
     return () => clearInterval(interval);
-  }, [isPaused, isPoseReady, isUserInView]);
+  }, [isPaused, isPoseReady, isFullyVisible]);
 
   useEffect(() => {
     const init = async () => {
@@ -99,77 +116,72 @@ export function ActiveWorkoutPage() {
 
       if (!landmarks) return;
 
-      // 1. POSITIONING FEEDBACK (Move Back, Right, Left)
-      const criticalPoints = [11, 12, 23, 24, 25, 26, 27, 28]; // shoulders, hips, knees, ankles
-      const avgVisibility = criticalPoints.reduce((acc, idx) => acc + landmarks[idx].visibility, 0) / criticalPoints.length;
-      
-      // Horizontal positioning
-      const centerX = (landmarks[11].x + landmarks[12].x) / 2;
-      
-      let positioningCue = "";
-      if (avgVisibility < 0.6) {
-        positioningCue = "Move back. I need to see your full body.";
-      } else if (centerX < 0.3) {
-        positioningCue = "Move to your right.";
-      } else if (centerX > 0.7) {
-        positioningCue = "Move to your left.";
+      // 1. ROBUST VISIBILITY CHECK
+      // Must see Hips(23,24), Knees(25,26), and Ankles(27,28) with high confidence
+      const keyPoints = [23, 24, 25, 26, 27, 28];
+      const allVisible = keyPoints.every(idx => landmarks[idx] && landmarks[idx].visibility > 0.75);
+
+      if (allVisible) {
+        visibleFrameCount.current += 1;
+      } else {
+        visibleFrameCount.current = 0;
+        if (isFullyVisible) setIsFullyVisible(false);
       }
 
-      if (positioningCue) {
-        if (isUserInView) setIsUserInView(false);
-        speak(positioningCue, false);
+      // Only announce start after 10 clean frames of full body visibility
+      if (visibleFrameCount.current >= REQUIRED_VISIBLE_FRAMES && !hasAnnouncedStart.current) {
+        hasAnnouncedStart.current = true;
+        setIsFullyVisible(true);
+        speak("I can see you clearly now. Start your squats!", true);
         return;
       }
 
-      if (!isUserInView) {
-        setIsUserInView(true);
-        speak("Start! Begin your squats.", true);
-        return;
-      }
+      if (!isFullyVisible || isPaused) return;
 
-      if (isPaused) return;
-
-      // 2. REPS & PERFORMANCE FEEDBACK
+      // 2. INTELLIGENT REPS & FEEDBACK
       if (angle !== null) {
-        // GOING DOWN
+        // Going down phase
         if (repState.current === 'up' && angle < (thresholds.standing_threshold - 30)) {
           repState.current = 'down';
-          currentRepErrors.current = []; // Reset errors for new rep
+          currentRepErrors.current = [];
+          minAngleInCurrentRep.current = angle;
         } 
         
-        // COMPLETING REP
-        if (repState.current === 'down' && angle > (thresholds.standing_threshold - 15)) {
-          repState.current = 'up';
-          setReps(r => r + 1);
+        if (repState.current === 'down') {
+          // Track the deepest point reached in this rep
+          if (angle < minAngleInCurrentRep.current) {
+            minAngleInCurrentRep.current = angle;
+          }
+
+          // INTELLIGENT DEPTH CUE
+          // Only tell them to go deeper if they stop descending (angle starts increasing)
+          // but they are still above the bottom_max target.
+          const isAscending = angle > minAngleInCurrentRep.current + 5; 
           
-          // Positive feedback if no errors were spoken during the rep
-          if (currentRepErrors.current.length === 0) {
-            speak("Perfect! Correct way.", true);
+          if (isAscending && minAngleInCurrentRep.current > (thresholds.bottom_max + 10)) {
+            speak(cues.insufficient_depth || "Lower your hips a bit more.", false, 'insufficient_depth');
+          } else if (angle < thresholds.too_deep_threshold) {
+             speak(cues.excessive_depth || "Don't go too deep.", false, 'excessive_depth');
+          }
+          
+          // Posture check
+          if (spineAngle !== null && spineAngle < 110) {
+            speak(cues.forward_lean || "Keep your chest up.", false, 'forward_lean');
           }
         }
 
-        // 3. CORRECTION FEEDBACK
-        if (repState.current === 'down') {
-          if (angle > (thresholds.bottom_max + 15)) {
-            const cue = cues.insufficient_depth || "Lower your hips a bit more.";
-            speak(cue);
-            if (!currentRepErrors.current.includes('depth')) currentRepErrors.current.push('depth');
-          } else if (angle < thresholds.too_deep_threshold) {
-            const cue = cues.excessive_depth || "Too deep.";
-            speak(cue);
-            if (!currentRepErrors.current.includes('depth')) currentRepErrors.current.push('depth');
-          }
-          
-          if (spineAngle !== null && spineAngle < 110) {
-            const cue = cues.forward_lean || "Keep your chest up.";
-            speak(cue);
-            if (!currentRepErrors.current.includes('lean')) currentRepErrors.current.push('lean');
+        // Completing rep
+        if (repState.current === 'down' && angle > (thresholds.standing_threshold - 15)) {
+          repState.current = 'up';
+          setReps(r => r + 1);
+          if (currentRepErrors.current.length === 0) {
+            speak("Perfect!", true);
           }
         }
       }
     });
 
-  }, [isPoseReady, exercise, isPaused, isUserInView]);
+  }, [isPoseReady, exercise, isPaused, isFullyVisible]);
 
   useEffect(() => {
     return () => {
@@ -186,14 +198,14 @@ export function ActiveWorkoutPage() {
 
   const handleFinish = async () => {
     if (!exercise) return;
-    speak("Complete.", true);
+    speak("Workout complete.", true);
     if (videoRef.current) stopCamera(videoRef.current);
     try {
       await exerciseService.submitSessionSummary({
         exercise_id: exercise.id,
         reps_completed: reps,
         duration_seconds: seconds,
-        form_errors: [] 
+        form_errors: sessionErrors.current
       });
       navigate("/workout/summary", { state: { exerciseName: exercise.name, reps, duration: formatTime(seconds) } });
     } catch (e) {
@@ -205,34 +217,33 @@ export function ActiveWorkoutPage() {
 
   return (
     <PageTransition variant="fade" className="fixed inset-0 z-[100] flex flex-col bg-black text-white overflow-hidden">
-      {/* HUD */}
+      {/* COMPACT HUD */}
       {isCameraActive && (
-        <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between px-6 pt-12 pb-6 bg-gradient-to-b from-black/60 to-transparent">
+        <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between px-6 pt-12 pb-6 bg-gradient-to-b from-black/80 to-transparent">
           <div className="flex items-center gap-3">
              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-white/60 bg-white/5 border border-white/10 rounded-full"
+                variant="ghost" size="icon" 
+                className="h-8 w-8 text-white/50 bg-white/5 border border-white/10 rounded-full"
                 onClick={() => setIsMuted(!isMuted)}
               >
               {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
             </Button>
             <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-white/40 tracking-[0.2em]">{isUserInView ? 'CONNECTED' : 'CALIBRATING'}</span>
-              <span className="font-bold text-xs">{exercise?.name}</span>
+              <span className="text-[8px] uppercase font-bold text-white/40 tracking-[0.2em]">{isFullyVisible ? 'READY' : 'POSITIONING'}</span>
+              <span className="font-bold text-xs uppercase">{exercise?.name}</span>
             </div>
           </div>
           
           <div className="flex gap-2">
-            <div className="flex items-center gap-4 px-4 py-2 bg-black/60 rounded-2xl border border-white/5 backdrop-blur-3xl shadow-2xl">
+            <div className="flex items-center gap-4 px-4 py-2 bg-black/60 rounded-xl border border-white/5 backdrop-blur-3xl">
               <div className="flex flex-col items-center">
                 <span className="text-[8px] uppercase font-bold text-primary">Reps</span>
-                <span className="text-2xl font-black">{reps}</span>
+                <span className="text-xl font-black">{reps}</span>
               </div>
-              <div className="w-[1px] h-6 bg-white/10" />
+              <div className="w-[1px] h-4 bg-white/10" />
               <div className="flex flex-col items-center">
                 <span className="text-[8px] uppercase font-bold text-white/30">Time</span>
-                <span className="text-2xl font-mono">{formatTime(seconds)}</span>
+                <span className="text-xl font-mono">{formatTime(seconds)}</span>
               </div>
             </div>
           </div>
@@ -244,30 +255,28 @@ export function ActiveWorkoutPage() {
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none" playsInline />
         
         {!isCameraActive ? (
-          <div className="text-center p-8 space-y-8 animate-in fade-in duration-500">
-            <div className="h-24 w-24 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary shadow-[0_0_80px_rgba(70,130,180,0.2)]">
-              <CameraIcon size={32} />
+          <div className="text-center p-8 space-y-12">
+            <div className="h-28 w-28 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary shadow-2xl shadow-primary/30">
+              <CameraIcon size={40} />
             </div>
-             <div className="space-y-2">
-              <h3 className="text-2xl font-black tracking-tight uppercase">AI TRAINER</h3>
-              <p className="text-neutral-500 text-sm font-medium">Position full body for live guidance</p>
+            <div className="space-y-3">
+              <h3 className="text-3xl font-black tracking-tighter uppercase italic">Ready?</h3>
+              <p className="text-neutral-500 text-sm">Full body must be visible</p>
             </div>
-            <Button onClick={() => setIsCameraActive(true)} size="lg" className="rounded-full px-12 h-16 text-lg font-black shadow-2xl shadow-primary/20">
-              Start Session
+            <Button onClick={() => setIsCameraActive(true)} size="lg" className="rounded-full px-16 h-20 text-xl font-black shadow-2xl shadow-primary/20">
+              Go Live
             </Button>
           </div>
         ) : (
           <div className="w-full h-full touch-none relative">
             <canvas ref={canvasRef} className="w-full h-full object-cover" width={640} height={480} />
             
-            {!isUserInView && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-md z-30">
-                <div className="bg-black/90 border border-white/10 px-8 py-8 rounded-[2rem] text-center space-y-4 max-w-xs shadow-2xl">
-                  <div className="flex justify-center"><LoadingSpinner size="lg" /></div>
-                  <div className="space-y-1">
-                    <p className="text-lg font-black text-primary tracking-widest uppercase">Calibrating</p>
-                    <p className="text-xs text-neutral-400 leading-relaxed font-medium">Follow voice instructions to align your body perfectly.</p>
-                  </div>
+            {/* Calibration Warning */}
+            {!isFullyVisible && (
+              <div className="absolute inset-x-0 bottom-32 flex justify-center z-40 px-6">
+                <div className="bg-black/80 border border-white/10 px-8 py-4 rounded-2xl flex items-center gap-4 shadow-2xl backdrop-blur-xl">
+                  <LoadingSpinner size="sm" />
+                  <p className="text-sm font-bold text-white uppercase tracking-widest animate-pulse">Waiting for full body view...</p>
                 </div>
               </div>
             )}
@@ -278,27 +287,15 @@ export function ActiveWorkoutPage() {
       {/* FLOATING CONTROLS */}
       {isCameraActive && (
         <div className="absolute bottom-10 left-0 right-0 z-[110] flex items-center justify-center gap-8 pointer-events-none">
-          <Button 
-            variant="outline" size="icon" 
-            className="h-14 w-14 rounded-full border-2 border-white/10 bg-black/20 hover:bg-black/40 pointer-events-auto backdrop-blur-xl"
-            onClick={() => navigate(-1)}
-          >
+          <Button variant="outline" size="icon" className="h-14 w-14 rounded-full border-2 border-white/10 bg-black/20 pointer-events-auto backdrop-blur-xl" onClick={() => navigate(-1)}>
             <SkipForward size={20} className="text-white/40" />
           </Button>
 
-          <Button 
-            size="icon" 
-            className="h-20 w-20 rounded-full shadow-2xl bg-primary hover:bg-primary/90 pointer-events-auto transition-transform active:scale-90"
-            onClick={() => setIsPaused(!isPaused)}
-          >
+          <Button size="icon" className="h-20 w-20 rounded-full shadow-2xl bg-primary pointer-events-auto" onClick={() => setIsPaused(!isPaused)}>
             {isPaused ? <Play size={32} className="ml-1" /> : <Pause size={32} />}
           </Button>
 
-          <Button 
-            variant="outline" size="icon" 
-            className="h-14 w-14 rounded-full border-2 border-white/10 bg-black/20 hover:bg-black/40 pointer-events-auto backdrop-blur-xl"
-            onClick={handleFinish}
-          >
+          <Button variant="outline" size="icon" className="h-14 w-14 rounded-full border-2 border-white/10 bg-black/20 pointer-events-auto" onClick={handleFinish}>
             <Square size={20} className="text-destructive font-bold" />
           </Button>
         </div>

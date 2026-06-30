@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { CheckCircle2, Flame, Clock, Trophy, ArrowRight } from "lucide-react";
+import { CheckCircle2, Zap, Clock, Trophy, ArrowRight, History } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { PageTransition } from "@/components/common/PageTransition";
@@ -8,81 +8,73 @@ export function SessionSummaryPage() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Get data passed from ActiveWorkoutPage
   const { exerciseName, reps, duration } = location.state || {
     exerciseName: "Session",
     reps: 0,
     duration: "00:00"
   };
 
-  // Mock calorie calculation (usually this would come from a formula or backend)
-  const calories = Math.round(reps * 0.5 * 10); 
-
   return (
-    <PageTransition variant="scale" className="flex flex-col min-h-screen bg-surface-base p-6">
+    <PageTransition variant="scale" className="flex flex-col min-h-screen bg-neutral-50 dark:bg-black p-6">
       <div className="flex-1 flex flex-col items-center justify-center space-y-8 max-w-md mx-auto w-full">
         
         <div className="text-center space-y-4">
-          <div className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-2 shadow-inner">
-            <CheckCircle2 className="h-12 w-12" />
+          <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mb-2 shadow-2xl">
+            <CheckCircle2 size={40} />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">Set Complete!</h1>
-          <p className="text-muted-foreground font-medium">{exerciseName} training</p>
+          <div>
+            <h1 className="text-4xl font-black text-foreground uppercase tracking-tighter italic">Set Complete!</h1>
+            <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-[0.3em] mt-2">{exerciseName} Finished</p>
+          </div>
         </div>
 
+        {/* RESULTS GRID */}
         <div className="grid grid-cols-2 gap-4 w-full">
-          <Card className="bg-card border-none shadow-sm">
-            <CardContent className="p-5 flex flex-col items-center justify-center text-center">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                <Clock className="h-5 w-5 text-primary" />
+          <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+            <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+              <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                <Zap size={24} />
               </div>
-              <div className="text-2xl font-black">{duration}</div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Duration</div>
+              <div className="text-3xl font-black text-foreground">{reps}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">Total Reps</div>
             </CardContent>
           </Card>
           
-          <Card className="bg-card border-none shadow-sm">
-            <CardContent className="p-5 flex flex-col items-center justify-center text-center">
-              <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center mb-3">
-                <Flame className="h-5 w-5 text-orange-500" />
+          <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+            <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+              <div className="h-12 w-12 rounded-2xl bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center mb-4 text-blue-500">
+                <Clock size={24} />
               </div>
-              <div className="text-2xl font-black">{calories}</div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Calories</div>
+              <div className="text-3xl font-black text-foreground">{duration}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">Duration</div>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="w-full bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/10 shadow-lg shadow-primary/5 overflow-hidden relative">
-          <div className="absolute -right-4 -top-4 h-24 w-24 bg-primary/10 rounded-full blur-2xl" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="h-14 w-14 rounded-2xl bg-primary/20 flex items-center justify-center text-primary shadow-sm rotate-3">
-              <Trophy className="h-8 w-8" />
+        <Card className="w-full bg-gradient-to-br from-primary/5 to-transparent border border-primary/10 overflow-hidden relative rounded-[2rem]">
+          <div className="absolute -right-4 -top-4 h-24 w-24 bg-primary/10 rounded-full blur-3xl" />
+          <CardContent className="p-8 flex items-center gap-6 relative z-10">
+            <div className="h-16 w-16 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30 -rotate-6 shrink-0">
+              <Trophy size={32} />
             </div>
             <div>
-              <p className="font-bold text-lg text-foreground">Nice Work!</p>
-              <p className="text-sm text-muted-foreground">
-                You successfully completed <span className="font-bold text-primary">{reps} reps</span> of {exerciseName}.
+              <p className="font-black text-xl text-foreground uppercase italic tracking-tight italic">Elite Effort!</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Your performance has been logged to your <span className="text-primary font-bold">training history</span>. Keep pushing!
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="mt-auto pt-8 flex flex-col gap-3">
+      <div className="mt-auto pt-8 flex flex-col gap-4 pb-10">
         <Button 
-          className="w-full h-14 rounded-2xl text-lg shadow-xl shadow-primary/20" 
+          className="w-full h-16 rounded-[2rem] text-xl font-black shadow-2xl shadow-primary/20 uppercase italic transition-transform active:scale-95" 
           size="lg"
           onClick={() => navigate("/dashboard")}
-          rightIcon={<ArrowRight className="h-5 w-5" />}
         >
-          Return to Dashboard
-        </Button>
-        <Button 
-          variant="outline"
-          className="w-full h-12 rounded-2xl border-2" 
-          onClick={() => navigate("/exercises")}
-        >
-          Start New Exercise
+          Finish & Return
+          <ArrowRight className="ml-2 h-6 w-6" />
         </Button>
       </div>
     </PageTransition>

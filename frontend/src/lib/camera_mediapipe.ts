@@ -110,7 +110,7 @@ export function processPose(
     });
 
     poseInstance.setOptions({
-        modelComplexity: 1,
+        modelComplexity: 0, // 0 = Lite (Fastest), 1 = Full, 2 = Heavy
         smoothLandmarks: true,
         enableSegmentation: false,
         minDetectionConfidence: 0.5,

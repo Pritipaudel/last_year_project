@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Activity } from "lucide-react";
+import { Calendar, Activity, CheckCircle2, AlertCircle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -32,62 +32,115 @@ export function HistoryPage() {
   const totalMinutes = sessions.reduce((acc, s) => acc + s.duration_minutes, 0);
 
   return (
-    <PageTransition variant="fade" className="flex flex-col min-h-screen pb-20 md:pb-6">
-      <Header title="Workout History" />
+    <PageTransition variant="fade" className="flex flex-col min-h-screen pb-24 bg-neutral-50 dark:bg-black">
+      <Header title="Workout Statistics" />
       
-      <div className="p-4 sm:p-6 space-y-6">
-        <div className="flex gap-4 mb-6">
-          <Card className="flex-1 bg-primary text-primary-foreground border-none shadow-lg shadow-primary/20">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold">{sessions.length}</div>
-              <div className="text-xs opacity-80 uppercase tracking-wider">Workouts</div>
+      <div className="p-4 sm:p-6 space-y-8">
+        {/* STATS SUMMARY */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="bg-primary text-primary-foreground border-none shadow-2xl shadow-primary/20 overflow-hidden relative group">
+            <div className="absolute -right-4 -top-4 bg-white/10 h-24 w-24 rounded-full transition-transform group-hover:scale-125 duration-500" />
+            <CardContent className="p-6 relative z-10">
+              <div className="text-3xl font-black">{sessions.length}</div>
+              <div className="text-[10px] opacity-70 uppercase font-bold tracking-[0.2em] mt-1">Sessions</div>
             </CardContent>
           </Card>
-          <Card className="flex-1 border-primary/10">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-primary">{totalMinutes}</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Active Mins</div>
+          <Card className="border-none bg-white dark:bg-neutral-900 shadow-sm overflow-hidden relative group">
+            <div className="absolute -right-4 -top-4 bg-primary/5 h-24 w-24 rounded-full transition-transform group-hover:scale-125 duration-500" />
+            <CardContent className="p-6 relative z-10">
+              <div className="text-3xl font-black text-primary">{totalMinutes}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em] mt-1">Active Mins</div>
             </CardContent>
           </Card>
         </div>
 
-        {sessions.length > 0 ? (
-          <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-            {sessions.map((session, i) => (
-              <div key={session.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-background bg-primary text-primary-foreground shadow-md shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-transform group-hover:scale-110">
-                  <Activity className="h-4 w-4" />
-                </div>
-                <Card className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] hover:border-primary/50 transition-all hover:shadow-md">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-1">
-                      <h4 className="font-bold text-foreground">
-                        {session.exercise_name || session.title}
-                      </h4>
-                      <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                        {new Date(session.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      <Badge variant="outline" className="text-[10px] bg-primary/5 hover:bg-primary/5">
-                        <Calendar className="h-3 w-3 mr-1 text-primary" /> {session.duration_minutes} mins
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] bg-muted/50 hover:bg-muted/50">
-                        {session.reps} reps
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 px-4 bg-muted/10 rounded-2xl border border-dashed text-muted-foreground">
-            <Activity className="h-12 w-12 mx-auto mb-4 opacity-20" />
-            <p>No workout history found yet.</p>
-            <p className="text-sm mt-1">Complete a workout to see it here!</p>
-          </div>
-        )}
+        {/* TIMELINE */}
+        <div className="space-y-4">
+          <h3 className="text-xs uppercase font-black text-neutral-400 tracking-widest pl-1">Recent Activity</h3>
+          
+          {sessions.length > 0 ? (
+            <div className="space-y-3">
+              {sessions.map((session) => {
+                const errors = session.metadata?.form_errors || [];
+                const hasErrors = errors.length > 0;
+                
+                return (
+                  <Card key={session.id} className="group hover:border-primary/30 transition-all border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="flex">
+                        {/* LEFT STRIP */}
+                        <div className={`w-1.5 ${hasErrors ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                        
+                        <div className="flex-1 p-5">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="space-y-1">
+                              <div className="text-[10px] font-bold text-primary uppercase tracking-tighter">
+                                {session.workout_type}
+                              </div>
+                              <h4 className="font-black text-xl tracking-tight text-neutral-900 dark:text-white uppercase italic">
+                                {session.exercise_name || session.title}
+                              </h4>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] font-black text-neutral-400 block uppercase">
+                                {new Date(session.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                              </span>
+                              <span className="text-[10px] font-medium text-neutral-300">
+                                {new Date(session.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
+                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">Reps</span>
+                              <span className="text-lg font-black">{session.reps}</span>
+                            </div>
+                            <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
+                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">Time</span>
+                              <span className="text-lg font-black">{session.duration_minutes}m</span>
+                            </div>
+                            <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
+                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">Result</span>
+                              <div className="flex items-center gap-1">
+                                {hasErrors ? (
+                                  <>
+                                    <AlertCircle className="h-3 w-3 text-amber-500" />
+                                    <span className="text-[10px] font-bold text-white">Adjust</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                    <span className="text-[10px] font-bold text-white">Focus</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {hasErrors && (
+                            <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-dashed border-neutral-100 dark:border-white/5 lg:hidden">
+                               <span className="text-[9px] font-bold text-neutral-400">Notes:</span>
+                               <span className="text-[9px] text-neutral-500 italic">
+                                  {errors.length} form corrections suggested during session.
+                               </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-20 px-8 bg-white dark:bg-neutral-900 rounded-3xl border-2 border-dashed border-neutral-200 dark:border-neutral-800">
+              <Activity className="h-16 w-16 mx-auto mb-6 text-neutral-200" />
+              <h3 className="text-lg font-bold text-neutral-400">Fresh start!</h3>
+              <p className="text-sm text-neutral-500 mt-2">Your exercise history will appear here once you complete your first AI-guided session.</p>
+            </div>
+          )}
+        </div>
       </div>
     </PageTransition>
   );
