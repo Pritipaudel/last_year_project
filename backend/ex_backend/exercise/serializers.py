@@ -34,7 +34,7 @@ class WorkoutSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkoutSession
         fields = [
-            'id', 'title', 'workout_type', 'duration_minutes', 
+            'id', 'title', 'workout_type', 'duration_minutes',
             'created_at', 'exercise_name', 'reps', 'metadata'
         ]
 
@@ -53,11 +53,15 @@ class SessionSummarySerializer(serializers.Serializer):
 
     The frontend sends:
     - exercise_id: which exercise was performed
-    - reps_completed: integer counted by the frontend state machine
+    - reps_completed: integer (min of both arms for curl; total reps for other exercises)
+    - reps_left:  (optional) individual left arm rep count — for bilateral exercises
+    - reps_right: (optional) individual right arm rep count — for bilateral exercises
     - form_errors: list of error events {error_type, count, timestamp}
     - duration_seconds: total time for the set
+    - goal_context: (optional) the goal tag active during this session for logging
 
     This creates a WorkoutSession + ExerciseLog pair so results are persisted.
+    History page reads from WorkoutSession — no changes needed there.
     """
     exercise_id = serializers.IntegerField()
     reps_completed = serializers.IntegerField(min_value=0)
@@ -67,20 +71,33 @@ class SessionSummarySerializer(serializers.Serializer):
         required=False,
         default=list
     )
+    # Optional per-arm data for bilateral exercises (e.g. Dumbbell Bicep Curl)
+    reps_left = serializers.IntegerField(min_value=0, required=False, default=0)
+    reps_right = serializers.IntegerField(min_value=0, required=False, default=0)
+    # Optional goal context for richer session metadata
+    goal_context = serializers.CharField(required=False, default='', allow_blank=True)
 
     def create(self, validated_data):
         user = self.context['request'].user
         exercise = Exercise.objects.get(pk=validated_data['exercise_id'])
+
+        # Build metadata — includes per-arm data if provided
+        meta = {
+            'form_errors': validated_data.get('form_errors', []),
+            'source': 'live_tracking',
+        }
+        if validated_data.get('reps_left') or validated_data.get('reps_right'):
+            meta['reps_left'] = validated_data.get('reps_left', 0)
+            meta['reps_right'] = validated_data.get('reps_right', 0)
+        if validated_data.get('goal_context'):
+            meta['goal_context'] = validated_data['goal_context']
 
         session = WorkoutSession.objects.create(
             user=user,
             title=f"{exercise.name} Session",
             workout_type=exercise.muscle_group,
             duration_minutes=max(1, validated_data['duration_seconds'] // 60),
-            metadata={
-                'form_errors': validated_data.get('form_errors', []),
-                'source': 'live_tracking',
-            }
+            metadata=meta,
         )
 
         ExerciseLog.objects.create(
@@ -95,5 +112,7 @@ class SessionSummarySerializer(serializers.Serializer):
             'session_id': session.id,
             'exercise': exercise.name,
             'reps_completed': validated_data['reps_completed'],
+            'reps_left': validated_data.get('reps_left', 0),
+            'reps_right': validated_data.get('reps_right', 0),
             'duration_seconds': validated_data['duration_seconds'],
         }

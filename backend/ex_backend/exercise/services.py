@@ -29,14 +29,18 @@ GOAL_TAG_MAP = {
     'general fitness': 'general',
     'stay fit': 'general',
     'maintain': 'general',
+    # Bicep curl and future exercises use 'stay_active' as a valid tag.
+    'stay_active': 'stay_active',
+    'stay active': 'stay_active',
+    'active': 'stay_active',
 }
 
 
 def _resolve_goal_tag(profile_goal: str | None) -> str:
     """
-    Normalise the free-text BiometricProfile.goal field into one of the three
-    canonical goal_tag values: 'weight_loss', 'weight_gain', 'general'.
-    Falls back to 'general' if the goal is unset or unrecognised.
+    Normalise the free-text BiometricProfile.goal field into one of the
+    canonical goal_tag values: 'weight_loss', 'weight_gain', 'general',
+    'stay_active'. Falls back to 'general' if the goal is unset or unrecognised.
     """
     if not profile_goal:
         return 'general'
@@ -52,18 +56,49 @@ def _safe_band(profile) -> str:
     return profile.age_group or '26-40'
 
 
-def _personalize(user, exercise: Exercise, band: str) -> dict:
+def _get_postural_flags(profile) -> dict:
     """
-    Given a raw Exercise ORM object and an age band, return a dict containing
-    only the data the frontend needs for this specific user's live session:
+    Return the latest PosturalAssessment deviation flags for the user, or an
+    empty dict if no assessment exists. Used to optionally elevate voice cue
+    priority (e.g. shoulder elevation cue up if rounded_shoulders is flagged).
+
+    Deliberately wraps in try/except so a missing or malformed assessment
+    never crashes the exercise personalisation pipeline.
+    """
+    try:
+        latest = profile.assessments.order_by('-created_at').first()
+        if latest:
+            return {
+                'deviations': latest.deviations or {},
+                'joint_angles': latest.joint_angles or {},
+            }
+    except Exception:
+        pass
+    return {'deviations': {}, 'joint_angles': {}}
+
+
+def _personalize(user, exercise: Exercise, band: str, goal_tag: str) -> dict:
+    """
+    Given a raw Exercise ORM object, an age band, and a resolved goal tag,
+    return a dict containing only the data the frontend needs for this specific
+    user's live session:
+
     - basic exercise info
     - the angle thresholds for THIS user's age band
-    - the rep/set/rest config for THIS band
+    - the rep/set/rest/tempo config for THIS band AND THIS goal
     - the prioritised voice cue list for THIS band
+    - the state machine thresholds for rep counting
+    - the postural-flag-adjusted cue priority order
 
     If angle_ranges / rep_config / voice_cues are empty (exercise not yet
     calibrated), safe defaults are returned so the frontend never crashes.
+
+    rep_config supports two structures:
+      1. Flat (original squat style):  { "18-25": { sets, reps, rest_seconds } }
+      2. Goal-nested (curl style):     { "18-25": { "weight_gain": {...}, "weight_loss": {...} } }
+    Both are handled transparently.
     """
+    # ----- DEFAULTS -----
     default_angles = {
         'standing_threshold': 150,
         'bottom_min': 60,
@@ -72,8 +107,6 @@ def _personalize(user, exercise: Exercise, band: str) -> dict:
         'min_bottom_frames': 3,
     }
     default_rep = {'sets': 3, 'reps': 10, 'rest_seconds': 60}
-    
-    # Variety in cues for less repetitive feedback
     default_cues = {
         'insufficient_depth': 'Lower your hips a bit more to hit parallel.',
         'excessive_depth': 'You have hit peak depth, start rising.',
@@ -81,21 +114,65 @@ def _personalize(user, exercise: Exercise, band: str) -> dict:
         'knee_tracking': 'Keep your knees aligned over your toes.',
     }
 
-    # If the user has a specific age band, use those values
+    # ----- ANGLES -----
     band_angles = exercise.angle_ranges.get(band, default_angles)
     band_angles.setdefault('min_bottom_frames', 3)
 
-    band_rep = exercise.rep_config.get(band, default_rep)
+    # ----- REP CONFIG — handles both flat and goal-nested structures -----
+    band_rep_raw = exercise.rep_config.get(band, default_rep)
+    if isinstance(band_rep_raw, dict):
+        # Check if this is a goal-nested structure { "weight_gain": {...}, ... }
+        # A goal-nested dict has string keys that are goal names, not config keys.
+        first_key = next(iter(band_rep_raw), None)
+        is_goal_nested = first_key in GOAL_TAG_MAP or first_key in (
+            'weight_gain', 'weight_loss', 'stay_active', 'general'
+        )
+        if is_goal_nested:
+            # Try to match current goal, fall back to any available goal, then default
+            band_rep = band_rep_raw.get(goal_tag) or next(iter(band_rep_raw.values()), default_rep)
+        else:
+            # Flat structure (e.g. squat)
+            band_rep = band_rep_raw
+    else:
+        band_rep = default_rep
 
-    # Fetch cues and allow for future array-based randomisation if needed
+    # ----- VOICE CUES -----
     band_cues_raw = exercise.voice_cues.get(band, default_cues)
-    
+
+    # Priority order — default (squat). Curl exercises override this below.
     priority_order = [
         'insufficient_depth',
         'excessive_depth',
         'forward_lean',
         'knee_tracking',
     ]
+
+    # Detect curl exercise by name so we can apply curl-specific priority ordering
+    is_curl = 'curl' in exercise.name.lower()
+
+    if is_curl:
+        # Safety-first priority order for bicep curl (see implementation plan Step 5)
+        priority_order = [
+            'body_swing',           # P1 — trunk momentum, risk of lower back injury
+            'elbow_swing',          # P2 — elbow drift changes recruitment, injury risk
+            'shoulder_elevation',   # P3 — compensation pattern
+            'insufficient_curl',    # P4 — form quality
+            'incomplete_extension', # P5 — form quality
+        ]
+
+        # Optionally read postural flags to elevate shoulder_elevation priority
+        try:
+            profile = user.biometric_profile
+            flags = _get_postural_flags(profile)
+            deviations = flags.get('deviations', {})
+            # If postural assessment flagged rounded shoulders or shoulder asymmetry,
+            # elevate shoulder_elevation to P1 — most important correction to make.
+            if deviations.get('rounded_shoulders') or deviations.get('shoulder_asymmetry'):
+                priority_order.remove('shoulder_elevation')
+                priority_order.insert(0, 'shoulder_elevation')
+        except Exception:
+            pass  # No profile — keep default priority order
+
     band_cues_prioritised = {k: band_cues_raw.get(k, default_cues.get(k, '')) for k in priority_order}
 
     return {
@@ -108,11 +185,13 @@ def _personalize(user, exercise: Exercise, band: str) -> dict:
         'goal_tags': exercise.goal_tags,
         'personalization': {
             'age_band': band,
+            'goal': goal_tag,
             'user_name': getattr(user, 'first_name', user.username),
             'angle_ranges': band_angles,
             'rep_config': band_rep,
             'voice_cues': band_cues_prioritised,
-            'cue_cooldown_seconds': 6, 
+            'voice_cue_priority': priority_order,
+            'cue_cooldown_seconds': 8,
         },
     }
 
@@ -142,7 +221,7 @@ def get_personalized_exercises(user) -> list[dict]:
     # This correctly matches ["weight_loss", "general"] when filtering for "weight_loss".
     exercises = Exercise.objects.filter(goal_tags__contains=[goal_tag])
 
-    return [_personalize(user, ex, band) for ex in exercises]
+    return [_personalize(user, ex, band, goal_tag) for ex in exercises]
 
 
 def get_personalized_exercise_detail(user, exercise_id: int) -> dict | None:
@@ -157,10 +236,11 @@ def get_personalized_exercise_detail(user, exercise_id: int) -> dict | None:
         profile = None
 
     band = _safe_band(profile) if profile else '26-40'
+    goal_tag = _resolve_goal_tag(profile.goal if profile else None)
 
     try:
         exercise = Exercise.objects.get(pk=exercise_id)
     except Exercise.DoesNotExist:
         return None
 
-    return _personalize(user, exercise, band)
+    return _personalize(user, exercise, band, goal_tag)

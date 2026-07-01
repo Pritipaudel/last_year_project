@@ -1,38 +1,41 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Pause, Play, Square, SkipForward, Camera as CameraIcon, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Square, SkipForward, Camera as CameraIcon, Volume2, VolumeX, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PageTransition } from "@/components/common/PageTransition";
-import { exerciseService, Exercise } from "@/services/exerciseService";
+import { exerciseService, Exercise, isCurlExercise } from "@/services/exerciseService";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { initializeCamera, stopCamera, processPose } from "@/lib/camera_mediapipe";
+import { createCurlTracker } from "@/lib/curl_tracking";
 
-// Visibility check — only needs hips and knees (not ankles) to be confident.
-// Ankles often lose confidence during a deep squat and should NOT block feedback.
+// ================================================================
+// VISIBILITY HELPERS
+// ================================================================
+
+/** Squat: requires BOTH hips AND BOTH knees clearly visible (all 4 landmarks). */
 function isUpperLegVisible(landmarks: any[]): boolean {
-  const criticalPoints = [23, 24, 25, 26]; // hips + knees ONLY
-  return criticalPoints.every(idx => landmarks[idx] && landmarks[idx].visibility > 0.45);
+  return [23, 24, 25, 26].every(idx => landmarks[idx] && landmarks[idx].visibility > 0.5);
 }
 
-// Body in frame = head + hips detectable. Returns true if person is present at all.
+/** Both exercises: person is at least partially in frame. */
 function isInFrame(landmarks: any[]): boolean {
-  const bodyPoints = [0, 23, 24]; // nose + both hips
-  return bodyPoints.some(idx => landmarks[idx] && landmarks[idx].visibility > 0.35);
+  // Require at least 2 of: nose, left hip, right hip to avoid single-point false positives
+  const visible = [0, 23, 24].filter(idx => landmarks[idx] && landmarks[idx].visibility > 0.4);
+  return visible.length >= 2;
 }
 
-// Returns true if hips are visible (person is in frame) but knees are not
-function isHipsOnlyVisible(landmarks: any[]): boolean {
-  const hipsVis = [23, 24].every(idx => landmarks[idx] && landmarks[idx].visibility > 0.35);
-  const kneeVis = [25, 26].some(idx => landmarks[idx] && landmarks[idx].visibility > 0.45);
-  return hipsVis && !kneeVis;
+/**
+ * Curl: requires BOTH shoulders + BOTH elbows + BOTH wrists visible.
+ * This is the strict bilateral check — if any of the 6 landmarks is missing
+ * we cannot reliably track both arms.
+ */
+function isBothArmsFullyVisible(landmarks: any[]): boolean {
+  return [11, 12, 13, 14, 15, 16].every(idx => landmarks[idx] && landmarks[idx].visibility > 0.5);
 }
 
-// Returns true if only head/upper chest is visible (no hips)
-function isOnlyHeadVisible(landmarks: any[]): boolean {
-  const headVis = landmarks[0] && landmarks[0].visibility > 0.4;
-  const hipVis = [23, 24].some(idx => landmarks[idx] && landmarks[idx].visibility > 0.35);
-  return headVis && !hipVis;
-}
+// ================================================================
+// COMPONENT
+// ================================================================
 
 export function ActiveWorkoutPage() {
   const navigate = useNavigate();
@@ -50,45 +53,70 @@ export function ActiveWorkoutPage() {
   const [reps, setReps] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Curl-specific: bilateral rep display
+  const [repsLeft, setRepsLeft] = useState(0);
+  const [repsRight, setRepsRight] = useState(0);
+
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isPoseReady, setIsPoseReady] = useState(false);
   const [trackingStatus, setTrackingStatus] = useState<'calibrating' | 'tracking' | 'lost'>('calibrating');
 
-  // State machine: ready -> descending -> bottom -> ascending -> waiting_for_top -> ready
+  // ---- SQUAT STATE MACHINE ----
   const repState = useRef<'ready' | 'descending' | 'bottom' | 'ascending' | 'waiting_for_top'>('ready');
-  
-  // Voice cooldown management
+
+  // ---- CURL TRACKER (only instantiated for curl exercises) ----
+  const curlTrackerRef = useRef<ReturnType<typeof createCurlTracker> | null>(null);
+
+  // Voice cooldown management (used by both squat & curl engines)
   const lastSpokeAt = useRef<Record<string, number>>({});
-  
-  const sessionErrors = useRef<{ error_type: string, timestamp: string }[]>([]);
+
+  const sessionErrors = useRef<{ error_type: string; timestamp: string }[]>([]);
   const currentRepErrors = useRef<string[]>([]);
 
+  // Squat calibration
   const calibrationFrames = useRef(0);
   const calibrationAngles = useRef<number[]>([]);
   const calibratedStandingAngle = useRef<number | null>(null);
   const hasCalibrated = useRef(false);
 
+  // Squat: track consecutive full-leg-visible frames so 'let's start' isn't
+  // spoken prematurely. We need 25+ consecutive frames of good visibility.
+  const visibleFramesCount = useRef(0);
+
+  // Squat: how many frames we've been descending (prevents 'go lower' firing immediately)
+  const descendingFrameCount = useRef(0);
+  // Squat: how many frames held in bottom (noise filter before ascending)
+  const bottomHoldFrames = useRef(0);
+  // Squat: how many frames in ascending (ensures rep completion is stable)
+  const ascendingFrames = useRef(0);
+
   const minAngleInRep = useRef(180);
   const reachedBottom = useRef(false);
-  const lastKnownAngle = useRef<number | null>(null); // Persists across low-visibility frames
+  const lastKnownAngle = useRef<number | null>(null);
   const consecutiveLostFrames = useRef(0);
-  const LOST_THRESHOLD = 20;
+  const LOST_THRESHOLD = 25;
 
-  // Refs so the tracking callback always reads fresh values without re-subscribing
+  // Refs so tracking callback always reads fresh values without re-subscribing
   const isPausedRef = useRef(false);
   const exerciseRef = useRef<Exercise | null>(null);
   const isMutedRef = useRef(false);
+  const secondsRef = useRef(0);
+  const trackingStatusRef = useRef(trackingStatus);
 
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { exerciseRef.current = exercise; }, [exercise]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
+  useEffect(() => { secondsRef.current = seconds; }, [seconds]);
+  useEffect(() => { trackingStatusRef.current = trackingStatus; }, [trackingStatus]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = 'auto'; };
   }, []);
 
-  // ---------- VOICE ENGINE ----------
+  // ================================================================
+  // VOICE ENGINE — shared by both squat and curl
+  // ================================================================
   const speak = (text: string, key: string, cooldownMs = 4000) => {
     if (isMutedRef.current) return;
     const now = Date.now();
@@ -108,7 +136,9 @@ export function ActiveWorkoutPage() {
     window.speechSynthesis.speak(u);
   };
 
-  // ---------- DATA FETCH ----------
+  // ================================================================
+  // DATA FETCH
+  // ================================================================
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -129,14 +159,18 @@ export function ActiveWorkoutPage() {
     fetchData();
   }, [exerciseId]);
 
-  // ---------- TIMER ----------
+  // ================================================================
+  // TIMER
+  // ================================================================
   useEffect(() => {
     if (isPaused || trackingStatus !== 'tracking') return;
     const interval = setInterval(() => setSeconds(s => s + 1), 1000);
     return () => clearInterval(interval);
   }, [isPaused, trackingStatus]);
 
-  // ---------- CAMERA INIT ----------
+  // ================================================================
+  // CAMERA INIT
+  // ================================================================
   useEffect(() => {
     const init = async () => {
       if (isCameraActive && videoRef.current && canvasRef.current && exercise && !isPoseReady) {
@@ -147,180 +181,326 @@ export function ActiveWorkoutPage() {
     init();
   }, [isCameraActive, exercise, isPoseReady]);
 
-  // ---------- MAIN TRACKING LOOP ----------
+  // ================================================================
+  // MAIN TRACKING LOOP — dispatches to squat or curl engine
+  // ================================================================
   useEffect(() => {
     if (!isPoseReady || !exercise || !canvasRef.current || !videoRef.current) return;
 
+    const isCurl = isCurlExercise(exercise);
+
+    // ---- Initialise curl tracker if needed ----
+    if (isCurl && !curlTrackerRef.current) {
+      const p = exercise.personalization;
+      curlTrackerRef.current = createCurlTracker(
+        {
+          angle_ranges: p.angle_ranges as any,
+          voice_cues: p.voice_cues as any,
+          voice_cue_priority: p.voice_cue_priority || [],
+          cue_cooldown_seconds: p.cue_cooldown_seconds || 8,
+        },
+        speak,
+        (errorType: string, ts: number) => {
+          sessionErrors.current.push({ error_type: errorType, timestamp: String(ts) });
+        },
+        () => secondsRef.current
+      );
+    }
+
     const stopPose = processPose(videoRef.current, canvasRef.current, (results) => {
       const landmarks = results.landmarks;
-      const angle: number | null = results.knee_angle;
-      const spineAngle: number | null = results.spine_angle;
-
       const ex = exerciseRef.current;
       if (!ex || !landmarks) return;
+      if (isPausedRef.current) return;
+
+      // ---- CURL ENGINE ----
+      if (isCurlExercise(ex) && curlTrackerRef.current) {
+        const bothArmsVis = isBothArmsFullyVisible(landmarks);
+
+        if (!bothArmsVis) {
+          consecutiveLostFrames.current += 1;
+          if (consecutiveLostFrames.current >= LOST_THRESHOLD) {
+            setTrackingStatus('lost');
+            speak(
+              "Both arms must be fully visible. Step back and make sure both elbows are in frame.",
+              "curl_lost",
+              7000
+            );
+          }
+          return;
+        }
+
+        // Arms are visible — reset lost counter and restore status
+        if (consecutiveLostFrames.current >= LOST_THRESHOLD) {
+          const newStatus = hasCalibrated.current ? 'tracking' : 'calibrating';
+          setTrackingStatus(newStatus);
+          trackingStatusRef.current = newStatus;
+        }
+        consecutiveLostFrames.current = 0;
+
+        const tracker = curlTrackerRef.current;
+
+        // Feed EVERY frame to the tracker so calibration accumulates
+        const { leftReps, rightReps, totalReps } = tracker.processFrame(results);
+
+        // Wait for BOTH arms to calibrate before starting
+        if (!tracker.bothCalibrated()) {
+          setTrackingStatus('calibrating');
+          return;
+        }
+
+        // First frame where both arms are calibrated — announce start
+        if (!hasCalibrated.current) {
+          hasCalibrated.current = true;
+          setTrackingStatus('tracking');
+          speakImmediate("Perfect, let's start! Begin your first curl.");
+        }
+
+        setRepsLeft(leftReps);
+        setRepsRight(rightReps);
+        setReps(totalReps);
+        return;
+      }
+
+      // ---- SQUAT ENGINE ----
+      const angle: number | null = results.knee_angle;
+      const spineAngle: number | null = results.spine_angle;
 
       const thresholds = ex.personalization.angle_ranges;
       const cues = ex.personalization.voice_cues;
 
-      // ---- STEP 1: Visibility Checks ----
-      const inFrame = isInFrame(landmarks);
       const legsVisible = isUpperLegVisible(landmarks);
-      const onlyHead = isOnlyHeadVisible(landmarks);
-      const hipsOnlyVisible = isHipsOnlyVisible(landmarks);
 
-      if (!inFrame) {
+      // ---- VISIBILITY GATE ----
+      // Both legs must be continuously visible. Any frame without full leg
+      // visibility increments the lost counter. We only pause/reset the engine if
+      // they remain lost for a sustained period (LOST_THRESHOLD).
+      if (!legsVisible) {
         consecutiveLostFrames.current += 1;
+        visibleFramesCount.current = 0;
+        
         if (consecutiveLostFrames.current >= LOST_THRESHOLD) {
-          if (trackingStatus !== 'lost') setTrackingStatus('lost');
-          if (onlyHead) {
-            speak("I can only see your head. Please step further back so your full body is visible.", "lost_view", 7000);
-          } else {
-            speak("You have left the camera view. Please step back into frame.", "lost_view", 7000);
+          if (trackingStatusRef.current !== 'lost') {
+            setTrackingStatus('lost');
+            trackingStatusRef.current = 'lost';
+            speak(
+              hasCalibrated.current
+                ? "Required body not visible. Step back so your full legs are in frame."
+                : "Step back so I can see your full body, including both knees.",
+              "squat_lost",
+              7000
+            );
+          }
+          // Only hard reset the state if they've been gone for a full second
+          // This prevents tiny half-frame flickers from destroying rep counts
+          if (repState.current !== 'ready' && repState.current !== 'waiting_for_top') {
+            repState.current = 'ready';
+            reachedBottom.current = false;
           }
         }
         return;
       }
 
-      // Person is in frame — reset lost counter and status
+      // Legs are visible — update counters
       consecutiveLostFrames.current = 0;
-      if (trackingStatus === 'lost') setTrackingStatus(hasCalibrated.current ? 'tracking' : 'calibrating');
+      visibleFramesCount.current += 1;
 
-      // If hips visible but no legs — warn and skip rep logic (but don't say 'lost')
-      if (hasCalibrated.current && hipsOnlyVisible) {
-        speak("Step back — I cannot see your legs. Make sure your knees and hips are visible.", "legs_missing", 6000);
-        return;
+      // Restore status after gaining visibility
+      if (trackingStatusRef.current === 'lost') {
+        const newStatus = hasCalibrated.current ? 'tracking' : 'calibrating';
+        setTrackingStatus(newStatus);
+        trackingStatusRef.current = newStatus;
       }
 
-      // ---- STEP 2: Calibration Phase ----
+      // ---- CALIBRATION ----
+      // Collect 25 CONSECUTIVE frames of fully extended standing (angle > 155°).
+      // Reset calibration frames if angle drops (person bent knees during calibration).
       if (!hasCalibrated.current) {
-        if (legsVisible && angle !== null && angle > 155) {
+        if (angle !== null && angle > 155) {
           calibrationFrames.current += 1;
           calibrationAngles.current.push(angle);
+        } else {
+          // Bent knees during calibration — reset to avoid wrong baseline
+          calibrationFrames.current = Math.max(0, calibrationFrames.current - 3);
         }
-
-        if (calibrationFrames.current >= 12) {
-          // Enough stable standing frames — finalize calibration
-          const avg = calibrationAngles.current.reduce((a, b) => a + b, 0) / calibrationAngles.current.length;
+        if (calibrationFrames.current >= 25) {
+          const avg = calibrationAngles.current.slice(-25).reduce((a, b) => a + b, 0) / 25;
           calibratedStandingAngle.current = avg;
           hasCalibrated.current = true;
           setTrackingStatus('tracking');
-          speakImmediate("I can see you. Ready to begin — go down for your first rep.");
-          console.log(`Calibrated standing angle: ${avg.toFixed(1)}°`);
+          speakImmediate("Perfect, let's start! Go down for your first rep.");
         } else {
           setTrackingStatus('calibrating');
         }
         return;
       }
 
-      // ---- STEP 3: After calibration ----
-      // Update lastKnownAngle whenever we have a confident reading
-      if (angle !== null && legsVisible) {
-        lastKnownAngle.current = angle;
-      }
+      // Post-calibration: require real MediaPipe angle
+      if (angle === null) return;
+      lastKnownAngle.current = angle;
+      const effectiveAngle = angle;
 
-      // Use lastKnownAngle as fallback when visibility briefly drops mid-squat
-      // This is critical — deep squats often drop knee confidence
-      const effectiveAngle = angle ?? lastKnownAngle.current;
+      // ======================================================
+      // SQUAT STATE MACHINE
+      // ======================================================
+      //
+      // States:
+      //   ready        → waiting for squat to begin (standing still)
+      //   descending   → knee angle decreasing, approaching bottom
+      //   bottom       → reached valid depth zone, waiting to ascend
+      //   ascending    → knee angle increasing back to standing
+      //   waiting_top  → rep counted, waiting for full stand before next rep
+      //
+      // All transitions require MULTIPLE CONSECUTIVE frames in the new zone
+      // to prevent angle noise / jitter from causing phantom transitions.
+      // ======================================================
 
-      // If we are idle (ready/waiting) and can't see legs, don't process state machine
-      const isIdle = repState.current === 'ready' || repState.current === 'waiting_for_top';
-      if (isIdle && (!legsVisible || effectiveAngle === null)) {
-        return;
-      }
-      if (effectiveAngle === null) return;
+      // Standing angle calibrated. Use it + offsets for all thresholds.
+      const standingAngle = calibratedStandingAngle.current!;
 
-      // ---- STEP 4: Paused ----
-      if (isPausedRef.current) return;
+      // ENTRY: enter 'descending' when angle drops ≥ 12° below standing
+      // Highly sensitive so shallow reps are detected and coached, not ignored.
+      const descendTrigger = standingAngle - 12;
 
-      // ---- STEP 5: State Machine ----
-      // Default to 165 (typical standing) if calibration didn't complete — prevents thresholds being set too low
-      const standingAngle = calibratedStandingAngle.current || Math.max(thresholds.standing_threshold, 160);
-      const descendTrigger = standingAngle - 30;   // Enter rep when bent 30° below standing
-      const completeTrigger = standingAngle - 15;  // Rep completes when ~15° below standing
-      const resetTrigger = standingAngle - 8;      // Must be close to standing to start next rep
+      // EXIT ascending: only count rep when returns to within 12° of standing
+      // (ensures they actually stood back up, not just partially)
+      const completeTrigger = standingAngle - 12;
 
-      // A. STANDING — waiting for squat to begin
+      // RESET: reset to ready once back within 6° of standing
+      const resetTrigger = standingAngle - 6;
+
+      // Depth zone: Use config from backend, but bound by (standing - 55°) to be robust
+      // against different camera angles/calibration heights. 55° drop is a solid squat limit.
+      const bottomMax = Math.max((thresholds as any).bottom_max ?? 90, standingAngle - 60);
+      const tooDeepThreshold = (thresholds as any).too_deep_threshold ?? 50;
+
+      // ---- STATE: ready ----
       if (repState.current === 'ready') {
         if (effectiveAngle < descendTrigger) {
           repState.current = 'descending';
           minAngleInRep.current = effectiveAngle;
           reachedBottom.current = false;
+          descendingFrameCount.current = 1;
+          bottomHoldFrames.current = 0;
+          ascendingFrames.current = 0;
           currentRepErrors.current = [];
+          // Clear per-rep cooldowns
           delete lastSpokeAt.current['go_lower'];
           delete lastSpokeAt.current['a_little_more'];
           delete lastSpokeAt.current['insufficient'];
         }
+        // Standing still: no feedback
       }
 
-      // B. DESCENDING
+      // ---- STATE: descending ----
       else if (repState.current === 'descending') {
+        descendingFrameCount.current += 1;
         if (effectiveAngle < minAngleInRep.current) minAngleInRep.current = effectiveAngle;
 
-        const depthGap = effectiveAngle - thresholds.bottom_max;
-
-        if (effectiveAngle < thresholds.bottom_max) {
-          // HIT TARGET DEPTH
+        if (effectiveAngle < bottomMax) {
+          // Reached valid bottom zone — transition to bottom
           repState.current = 'bottom';
           reachedBottom.current = true;
-          speakImmediate("Good depth! Come back up.");
-        } else if (depthGap > 20) {
-          speak("Go lower.", "go_lower", 2500);
-        } else if (depthGap > 5) {
-          speak("A little more.", "a_little_more", 3000);
+          bottomHoldFrames.current = 1;
+          speakImmediate("Good depth!");
         }
 
-        // Premature rise
-        if (effectiveAngle > minAngleInRep.current + 12) {
-          speak(cues.insufficient_depth || "Too shallow. Go deeper next time.", "insufficient", 3000);
-          if (!currentRepErrors.current.includes('insufficient_depth')) {
-            currentRepErrors.current.push('insufficient_depth');
-            sessionErrors.current.push({ error_type: 'insufficient_depth', timestamp: seconds.toString() });
+        // Abort / early reversal detection: angle rose significantly after a descent attempt
+        // We track a 15° rise from the lowest point they reached to confirm they are coming back up
+        if (effectiveAngle > minAngleInRep.current + 15) {
+          // They reversed up BEFORE hitting bottomMax
+          if (minAngleInRep.current > standingAngle - 18) {
+            // Literally shivering/twitching — silently reset
+            repState.current = 'ready';
+          } else {
+            // A real attempt but didn't reach bottom — coach them based on how short they were
+            const gap = effectiveAngle - bottomMax;
+            if (gap > 40) {
+              speak("Try to go lower next time.", "go_lower", 5000);
+            } else {
+              speak("Just a little deeper on the next one.", "a_little_more", 5000);
+            }
+            
+            if (!currentRepErrors.current.includes('insufficient_depth')) {
+              currentRepErrors.current.push('insufficient_depth');
+              sessionErrors.current.push({
+                error_type: 'insufficient_depth',
+                timestamp: seconds.toString(),
+              });
+            }
+            repState.current = 'ascending';
+            ascendingFrames.current = 0;
           }
-          repState.current = 'ascending';
         }
       }
 
-      // C. BOTTOM — at or below target depth
+      // ---- STATE: bottom ----
       else if (repState.current === 'bottom') {
+        bottomHoldFrames.current += 1;
         if (effectiveAngle < minAngleInRep.current) minAngleInRep.current = effectiveAngle;
 
-        if (effectiveAngle < thresholds.too_deep_threshold) {
-          speak(cues.excessive_depth || "That's deep enough, come up now.", "too_deep", 3000);
+        // Too deep warning (only fire once per rep, after holding 3 frames)
+        if (bottomHoldFrames.current >= 3 && effectiveAngle < tooDeepThreshold) {
+          speak(
+            (cues as any).excessive_depth || "That's deep enough, start coming up.",
+            "too_deep",
+            4000
+          );
         }
 
-        if (effectiveAngle > minAngleInRep.current + 8) {
+        // Exit bottom: must have held for ≥3 frames AND angle rose ≥20° from min
+        // This prevents jitter (random 5° spike) from ending the bottom state
+        if (bottomHoldFrames.current >= 3 && effectiveAngle > minAngleInRep.current + 20) {
           repState.current = 'ascending';
+          ascendingFrames.current = 0;
         }
       }
 
-      // D. ASCENDING — coming back up
+      // ---- STATE: ascending ----
       else if (repState.current === 'ascending') {
+        ascendingFrames.current += 1;
+
         if (effectiveAngle > completeTrigger) {
-          if (reachedBottom.current) {
-            setReps(r => r + 1);
-            repState.current = 'waiting_for_top';
-            const praises = ["Perfect!", "Great rep!", "Keep it up!", "Excellent form!", "Nice work!"];
-            const praise = praises[Math.floor(Math.random() * praises.length)];
-            speakImmediate(praise || "Great rep!");
-          } else {
-            repState.current = 'waiting_for_top';
-            speakImmediate("Rep not counted. Try going deeper on the next one.");
+          // Must hold completeTrigger for ≥3 consecutive frames (not a jitter spike)
+          if (ascendingFrames.current >= 3) {
+            if (reachedBottom.current) {
+              setReps(r => r + 1);
+              repState.current = 'waiting_for_top';
+              const praises = ['Perfect!', 'Great rep!', 'Keep going!', 'Excellent!', 'Nice work!'];
+              speakImmediate(praises[Math.floor(Math.random() * praises.length)]);
+            } else {
+              // Didn't reach valid bottom — alert user why rep wasn't counted
+              repState.current = 'ready';
+              speakImmediate("Rep not counted. Make sure to go deeper.");
+            }
           }
+        } else if (effectiveAngle < minAngleInRep.current - 10) {
+          // Angle dropped again during ascent — they went back down
+          // Update minAngle and return to bottom state
+          repState.current = 'bottom';
+          if (effectiveAngle < minAngleInRep.current) minAngleInRep.current = effectiveAngle;
+          bottomHoldFrames.current = 0;
         }
       }
 
-      // E. RESET — must return near standing before next rep
+      // ---- STATE: waiting_for_top ----
+      // Rep already counted. Wait for person to fully stand before allowing next rep.
       else if (repState.current === 'waiting_for_top') {
         if (effectiveAngle > resetTrigger) {
           repState.current = 'ready';
         }
       }
 
-      // FORM CHECK — spine angle
-      if (repState.current !== 'ready' && repState.current !== 'waiting_for_top') {
-        if (spineAngle !== null && spineAngle < 105) {
-          speak(cues.forward_lean || "Keep your chest up.", "spine", 5000);
-        }
+      // ---- SPINE / CHEST CUE ----
+      // Only fire during active movement (descending or ascending), not while standing.
+      // Dropped threshold to < 55° (very extreme lean) as normal back squats naturally involve forward torso lean.
+      // 8-second cooldown prevents it repeating every 5 seconds.
+      if (
+        (repState.current === 'descending' || repState.current === 'bottom' || repState.current === 'ascending') &&
+        spineAngle !== null &&
+        spineAngle < 55
+      ) {
+        speak((cues as any).forward_lean || 'Keep your chest up.', 'spine', 8000);
       }
     });
 
@@ -329,7 +509,9 @@ export function ActiveWorkoutPage() {
     };
   }, [isPoseReady]); // Run once when pose is ready
 
-  // ---------- CLEANUP ----------
+  // ================================================================
+  // CLEANUP
+  // ================================================================
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
@@ -343,24 +525,60 @@ export function ActiveWorkoutPage() {
     return `${m}:${s}`;
   };
 
+  // ================================================================
+  // FINISH — builds payload for both squat and curl
+  // ================================================================
   const handleFinish = async () => {
     if (!exercise) return;
     speakImmediate("Workout complete. Well done!");
     if (videoRef.current) stopCamera(videoRef.current);
+
+    const isCurl = isCurlExercise(exercise);
+    const tracker = curlTrackerRef.current;
+
+    // Build per-error-type error list for history
+    let formErrors = sessionErrors.current;
+    if (isCurl && tracker) {
+      const errorCounts = tracker.getErrors();
+      // Convert { body_swing: 3, elbow_swing: 1 } → flat list matching existing history format
+      const errorList = Object.entries(errorCounts).flatMap(([type, count]) =>
+        Array.from({ length: count }, (_, i) => ({
+          error_type: type,
+          timestamp: String(i),
+        }))
+      );
+      formErrors = errorList;
+    }
+
     try {
       await exerciseService.submitSessionSummary({
         exercise_id: exercise.id,
         reps_completed: reps,
         duration_seconds: seconds,
-        form_errors: sessionErrors.current
+        form_errors: formErrors,
+        ...(isCurl && tracker ? {
+          reps_left: tracker.getCounts().left,
+          reps_right: tracker.getCounts().right,
+          goal_context: exercise.personalization.goal || '',
+        } : {}),
       });
-      navigate("/workout/summary", { state: { exerciseName: exercise.name, reps, duration: formatTime(seconds) } });
+      navigate("/workout/summary", {
+        state: {
+          exerciseName: exercise.name,
+          reps,
+          duration: formatTime(seconds),
+          // curl-specific extras shown on summary page
+          ...(isCurl ? { repsLeft, repsRight } : {}),
+        }
+      });
     } catch (e) {
       navigate("/dashboard");
     }
   };
 
   if (isLoading) return <LoadingSpinner fullScreen />;
+
+  const isCurl = exercise ? isCurlExercise(exercise) : false;
 
   return (
     <PageTransition variant="fade" className="fixed inset-0 z-[100] flex flex-col bg-black text-white overflow-hidden">
@@ -386,17 +604,42 @@ export function ActiveWorkoutPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 px-5 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl">
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] uppercase font-black text-primary">Reps</span>
-              <span className="text-xl font-black">{reps}</span>
+          {/* Rep counter — bilateral for curl, single for squat */}
+          {isCurl ? (
+            <div className="flex items-center gap-3 px-4 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl">
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] uppercase font-black text-blue-400">L ARM</span>
+                <span className="text-lg font-black">{repsLeft}</span>
+              </div>
+              <div className="w-[1px] h-4 bg-white/10" />
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] uppercase font-black text-primary">REPS</span>
+                <span className="text-xl font-black">{reps}</span>
+              </div>
+              <div className="w-[1px] h-4 bg-white/10" />
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] uppercase font-black text-blue-400">R ARM</span>
+                <span className="text-lg font-black">{repsRight}</span>
+              </div>
+              <div className="w-[1px] h-4 bg-white/10" />
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] uppercase font-black text-white/40">Time</span>
+                <span className="text-xl font-mono">{formatTime(seconds)}</span>
+              </div>
             </div>
-            <div className="w-[1px] h-4 bg-white/10" />
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] uppercase font-black text-white/40">Time</span>
-              <span className="text-xl font-mono">{formatTime(seconds)}</span>
+          ) : (
+            <div className="flex items-center gap-4 px-5 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl">
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] uppercase font-black text-primary">Reps</span>
+                <span className="text-xl font-black">{reps}</span>
+              </div>
+              <div className="w-[1px] h-4 bg-white/10" />
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] uppercase font-black text-white/40">Time</span>
+                <span className="text-xl font-mono">{formatTime(seconds)}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -408,11 +651,25 @@ export function ActiveWorkoutPage() {
           <div className="text-center p-8 space-y-12 animate-in fade-in zoom-in duration-500">
             <div className="h-28 w-28 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary shadow-2xl relative">
               <div className="absolute inset-0 rounded-full animate-ping bg-primary/10 opacity-30" />
-              <CameraIcon size={40} className="relative z-10" />
+              {isCurl ? <Dumbbell size={40} className="relative z-10" /> : <CameraIcon size={40} className="relative z-10" />}
             </div>
             <div className="space-y-4">
-              <h3 className="text-4xl font-black tracking-tighter uppercase italic text-white">Coach Mode</h3>
-              <p className="text-neutral-500 text-sm font-medium">Stand back so I can see your full body</p>
+              <h3 className="text-4xl font-black tracking-tighter uppercase italic text-white">
+                {isCurl ? 'Curl Coach' : 'Coach Mode'}
+              </h3>
+              <p className="text-neutral-500 text-sm font-medium">
+                {isCurl
+                  ? (exercise?.personalization.angle_ranges.position === 'seated'
+                      ? 'Sit with your back straight so I can see both arms'
+                      : 'Stand back so I can see your arms and upper body')
+                  : 'Stand back so I can see your full body'
+                }
+              </p>
+              {isCurl && exercise?.personalization.rep_config.load_note && (
+                <p className="text-neutral-600 text-xs font-medium italic">
+                  💡 {exercise.personalization.rep_config.load_note}
+                </p>
+              )}
             </div>
             <Button onClick={() => setIsCameraActive(true)} size="lg" className="rounded-full px-16 h-20 text-xl font-black shadow-2xl shadow-primary/20 bg-primary hover:bg-primary/90">
               Start Live Session
@@ -430,7 +687,10 @@ export function ActiveWorkoutPage() {
                 }`}>
                   <div className={`h-2 w-2 rounded-full animate-pulse ${trackingStatus === 'lost' ? 'bg-red-400' : 'bg-primary'}`} />
                   <p className="text-[10px] font-black text-white uppercase tracking-[0.3em]">
-                    {trackingStatus === 'lost' ? 'Step back — needs full body' : 'Calibrating... Stand still'}
+                    {trackingStatus === 'lost'
+                      ? (isCurl ? 'Step back — needs arms visible' : 'Step back — needs full body')
+                      : (isCurl ? 'Calibrating — hold arms at sides' : 'Calibrating... Stand still')
+                    }
                   </p>
                 </div>
               </div>
