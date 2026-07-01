@@ -84,7 +84,7 @@ export function BodyPhotoPage() {
           ankle_right: lastAssessmentRef.current.ankleAngleRight,
           spine: lastAssessmentRef.current.spine_angle
         },
-        deviations: lastAssessmentRef.current.deviations
+        deviations: lastAssessmentRef.current.deviations || {}
       };
 
       try {

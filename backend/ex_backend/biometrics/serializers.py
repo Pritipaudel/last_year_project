@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import BiometricProfile, PosturalAssessment
 
+
 class BiometricProfileSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     
