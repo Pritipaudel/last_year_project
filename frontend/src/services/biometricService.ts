@@ -27,7 +27,7 @@ export const biometricService = {
    * Update the user's biometric profile
    */
   updateProfile: async (profile: Partial<BiometricProfile>): Promise<BiometricProfile> => {
-    const { data } = await api.put("biometrics/profile/", profile);
+    const { data } = await api.patch("biometrics/profile/", profile);
     return data;
   }
 };

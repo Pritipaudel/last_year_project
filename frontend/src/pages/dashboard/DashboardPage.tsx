@@ -9,6 +9,7 @@ import { PageTransition } from "@/components/common/PageTransition";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useAuth } from "@/hooks/useAuth";
 import { exerciseService, Exercise, WorkoutSession } from "@/services/exerciseService";
+import { biometricService } from "@/services/biometricService";
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -17,17 +18,24 @@ export function DashboardPage() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [recentSessions, setRecentSessions] = useState<WorkoutSession[]>([]);
   const [todayExercise, setTodayExercise] = useState<Exercise | null>(null);
+  
+  const [currentGoal, setCurrentGoal] = useState<string>("");
+  const [isUpdatingGoal, setIsUpdatingGoal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [exData, sessionData] = await Promise.all([
+        const [exData, sessionData, profileData] = await Promise.all([
           exerciseService.getExercises(),
           exerciseService.getSessions(),
+          biometricService.getProfile(),
         ]);
         
         setExercises(exData);
         setRecentSessions(sessionData);
+        if (profileData && profileData.goal) {
+          setCurrentGoal(profileData.goal);
+        }
         
         // Pick Squat as "Today's Plan" if available, otherwise first exercise
         const squat = exData.find(ex => ex.name.toLowerCase().includes('squat'));
@@ -51,11 +59,48 @@ export function DashboardPage() {
       <Header title="Dashboard" />
       
       <div className="p-4 sm:p-6 space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">
-            Hello, {user?.name?.split(' ')[0] || 'User'}! 👋
-          </h2>
-          <p className="text-muted-foreground">Ready for your workout today?</p>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">
+              Hello, {user?.name?.split(' ')[0] || 'User'}! 👋
+            </h2>
+            <p className="text-muted-foreground">Ready for your workout today?</p>
+          </div>
+          
+          <div className="flex flex-col items-start sm:items-end bg-secondary/30 p-2 sm:px-3 sm:py-2 rounded-lg border border-primary/10">
+            <span className="text-[10px] uppercase font-bold text-primary tracking-wider mb-1">
+              Current Category
+            </span>
+            <select 
+              title="Fitness Goal"
+              value={currentGoal}
+              onChange={async (e) => {
+                const newGoal = e.target.value;
+                setCurrentGoal(newGoal);
+                setIsUpdatingGoal(true);
+                try {
+                  await biometricService.updateProfile({ goal: newGoal });
+                  // Reload exercises dynamically based on new goal
+                  const exData = await exerciseService.getExercises();
+                  setExercises(exData);
+                  const squat = exData.find(ex => ex.name.toLowerCase().includes('squat'));
+                  setTodayExercise(squat || exData[0] || null);
+                } catch (e) {
+                  console.error("Failed to update goal");
+                } finally {
+                  setIsUpdatingGoal(false);
+                }
+              }}
+              className="bg-transparent text-sm font-semibold border-none p-0 focus:ring-0 cursor-pointer outline-none w-auto"
+              disabled={isUpdatingGoal}
+            >
+              <option value="weight_gain" className="bg-background">Weight Gain</option>
+              <option value="weight_loss" className="bg-background">Weight Loss</option>
+              <option value="stay_active" className="bg-background">Stay Active</option>
+              <option value="flexibility" className="bg-background">Flexibility</option>
+              <option value="rehabilitation" className="bg-background">Doctor Recommended (Rehab)</option>
+            </select>
+          </div>
         </div>
 
         {todayExercise ? (

@@ -33,6 +33,10 @@ GOAL_TAG_MAP = {
     'stay_active': 'stay_active',
     'stay active': 'stay_active',
     'active': 'stay_active',
+    'flexibility': 'flexibility',
+    'rehab': 'rehabilitation',
+    'rehabilitation': 'rehabilitation',
+    'doctor recommended': 'rehabilitation',
 }
 
 
