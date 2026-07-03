@@ -15,3 +15,25 @@
     scrollbar-width: none;  /* Firefox */
   }
 }
+
+:root {
+  /* Layout & Cards */
+  --bg-dashboard: #f8faf9;
+  --bg-card: #ffffff;
+  --border-card: #f3f4f6;
+
+  /* Typography */
+  --text-main: #111827;
+  --text-muted: #9ca3af;
+
+  /* Primary Brand (Teal) */
+  --primary-solid: #2b6153;
+  --primary-hover: #224d42;
+  --primary-light: #59a28e;
+
+  /* Accents & Utilities */
+  --accent-surface: #e8f4f1;
+  --accent-text: #3d8b78;
+  --coral-surface: #fce8df;
+  --coral-text: #c05c3a;
+}
