@@ -116,3 +116,83 @@ class SessionSummarySerializer(serializers.Serializer):
             'reps_right': validated_data.get('reps_right', 0),
             'duration_seconds': validated_data['duration_seconds'],
         }
+
+
+class HoldSessionSummarySerializer(serializers.Serializer):
+    """
+    Receives the POST body from the frontend at the end of a Tree Pose (static hold) session.
+
+    Unlike rep-based exercises, hold sessions track:
+    - Per-leg hold durations (left and right independently)
+    - Target hold duration (for analytics comparison)
+    - Form errors with leg attribution
+    - Pose type (always "static_hold" for this serializer)
+    - Goal context (always "flexibility" for Tree Pose)
+    - Age group (for analytics stratification)
+
+    Creates a WorkoutSession + ExerciseLog pair.
+    ExerciseLog uses duration_seconds to store the MINIMUM of left/right hold
+    (conservative measure of session success).
+    """
+    exercise_id       = serializers.IntegerField()
+    left_leg_hold_duration_seconds  = serializers.FloatField(min_value=0)
+    right_leg_hold_duration_seconds = serializers.FloatField(min_value=0)
+    target_hold_duration_seconds    = serializers.FloatField(min_value=0)
+    form_errors_triggered = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list
+        # Each item: { "error_type": str, "count": int, "leg": str }
+    )
+    goal_context = serializers.CharField(default='flexibility', allow_blank=True)
+    age_group    = serializers.CharField(required=False, allow_blank=True)
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        exercise = Exercise.objects.get(pk=validated_data['exercise_id'])
+
+        left_hold  = validated_data['left_leg_hold_duration_seconds']
+        right_hold = validated_data['right_leg_hold_duration_seconds']
+        target     = validated_data['target_hold_duration_seconds']
+
+        meta = {
+            'source': 'live_tracking',
+            'pose_type': 'static_hold',
+            'left_leg_hold_seconds': left_hold,
+            'right_leg_hold_seconds': right_hold,
+            'target_hold_seconds': target,
+            'left_leg_success': left_hold >= target,
+            'right_leg_success': right_hold >= target,
+            'form_errors': validated_data.get('form_errors_triggered', []),
+            'goal_context': validated_data.get('goal_context', 'flexibility'),
+            'age_group': validated_data.get('age_group', ''),
+        }
+
+        session = WorkoutSession.objects.create(
+            user=user,
+            title=f"{exercise.name} Session",
+            workout_type=exercise.muscle_group,
+            # Duration = sum of both holds (total time the user was actively posing)
+            duration_minutes=max(1, int((left_hold + right_hold) / 60)),
+            metadata=meta,
+        )
+
+        ExerciseLog.objects.create(
+            session=session,
+            exercise=exercise,
+            sets=1,
+            reps=None,                           # not applicable for static hold
+            # Store minimum hold as duration — represents the weakest leg (conservative)
+            duration_seconds=int(min(left_hold, right_hold)),
+        )
+
+        return {
+            'session_id': session.id,
+            'exercise': exercise.name,
+            'left_leg_hold_seconds': left_hold,
+            'right_leg_hold_seconds': right_hold,
+            'target_hold_seconds': target,
+            'left_leg_success': left_hold >= target,
+            'right_leg_success': right_hold >= target,
+        }
+
