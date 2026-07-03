@@ -190,7 +190,7 @@ export function createCurlTracker(
                     arm.reps += 1;
                     // Single shared praise key prevents both arms double-speaking
                     const praises = ['Perfect!', 'Great curl!', 'Nice work!', 'Keep it up!', 'Excellent!'];
-                    speak(praises[arm.reps % praises.length], 'curl_praise', 3500);
+                    speak(praises[arm.reps % praises.length]!, 'curl_praise', 3500);
                 } else if (arm.curlAttempted) {
                     // They tried a real curl but didn't hold the peak long enough
                     fireError('insufficient_curl', cues.insufficient_curl, side);

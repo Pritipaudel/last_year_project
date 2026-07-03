@@ -74,6 +74,7 @@ export interface Exercise {
   imageUrl: string; // camelCase alias for UI components
   description: string;
   goal_tags: string[];
+  pose_type?: string;
   personalization: ExercisePersonalization;
 }
 
@@ -81,6 +82,7 @@ export interface FormError {
   error_type: string;
   count?: number;
   timestamp?: string;
+  leg?: string;
 }
 
 export interface SessionSummaryPayload {
@@ -95,6 +97,16 @@ export interface SessionSummaryPayload {
   goal_context?: string;
 }
 
+export interface HoldSessionSummaryPayload {
+  exercise_id: number;
+  left_leg_hold_duration_seconds: number;
+  right_leg_hold_duration_seconds: number;
+  target_hold_duration_seconds: number;
+  form_errors_triggered: FormError[];
+  goal_context?: string;
+  age_group?: string;
+}
+
 export interface WorkoutSession {
   id: number;
   title: string;
@@ -102,7 +114,7 @@ export interface WorkoutSession {
   duration_minutes: number;
   created_at: string;
   exercise_name: string;
-  reps: number;
+  reps: number | null;
   metadata: any;
 }
 
@@ -124,6 +136,10 @@ function normaliseExercise(raw: any): Exercise {
 // ----------------------------------------------------------------
 export function isCurlExercise(exercise: Exercise): boolean {
   return exercise.name.toLowerCase().includes('curl');
+}
+
+export function isStaticHoldExercise(exercise: Exercise): boolean {
+  return exercise.pose_type === 'static_hold';
 }
 
 // ----------------------------------------------------------------
@@ -156,6 +172,11 @@ export const exerciseService = {
    */
   submitSessionSummary: async (payload: SessionSummaryPayload): Promise<any> => {
     const { data } = await api.post("exercises/session/", payload);
+    return data;
+  },
+
+  submitHoldSessionSummary: async (payload: HoldSessionSummaryPayload): Promise<any> => {
+    const { data } = await api.post("exercises/session/hold/", payload);
     return data;
   },
 

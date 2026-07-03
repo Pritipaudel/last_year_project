@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Pause, Play, Square, SkipForward, Camera as CameraIcon, Volume2, VolumeX, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PageTransition } from "@/components/common/PageTransition";
-import { exerciseService, Exercise, isCurlExercise } from "@/services/exerciseService";
+import { exerciseService, Exercise, isCurlExercise, isStaticHoldExercise } from "@/services/exerciseService";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { initializeCamera, stopCamera, processPose } from "@/lib/camera_mediapipe";
 import { createCurlTracker } from "@/lib/curl_tracking";
+import { createTreePoseTracker } from "@/lib/tree_pose_tracking";
 
 // ================================================================
 // VISIBILITY HELPERS
@@ -57,6 +58,13 @@ export function ActiveWorkoutPage() {
   const [repsLeft, setRepsLeft] = useState(0);
   const [repsRight, setRepsRight] = useState(0);
 
+  // Tree Pose: hold display
+  const [treeHoldLeft, setTreeHoldLeft] = useState(0);
+  const [treeHoldRight, setTreeHoldRight] = useState(0);
+  const [treeActiveLeg, setTreeActiveLeg] = useState<'left' | 'right' | null>(null);
+  const [treeIsHolding, setTreeIsHolding] = useState(false);
+  const [treeTarget, setTreeTarget] = useState(0);
+
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isPoseReady, setIsPoseReady] = useState(false);
   const [trackingStatus, setTrackingStatus] = useState<'calibrating' | 'tracking' | 'lost'>('calibrating');
@@ -67,10 +75,13 @@ export function ActiveWorkoutPage() {
   // ---- CURL TRACKER (only instantiated for curl exercises) ----
   const curlTrackerRef = useRef<ReturnType<typeof createCurlTracker> | null>(null);
 
-  // Voice cooldown management (used by both squat & curl engines)
+  // ---- TREE POSE TRACKER ----
+  const treeTrackerRef = useRef<ReturnType<typeof createTreePoseTracker> | null>(null);
+
+  // Voice cooldown management (used by all engines)
   const lastSpokeAt = useRef<Record<string, number>>({});
 
-  const sessionErrors = useRef<{ error_type: string; timestamp: string }[]>([]);
+  const sessionErrors = useRef<{ error_type: string; timestamp: string; leg?: string }[]>([]);
   const currentRepErrors = useRef<string[]>([]);
 
   // Squat calibration
@@ -182,12 +193,13 @@ export function ActiveWorkoutPage() {
   }, [isCameraActive, exercise, isPoseReady]);
 
   // ================================================================
-  // MAIN TRACKING LOOP — dispatches to squat or curl engine
+  // MAIN TRACKING LOOP — dispatches to squat, curl, or tree pose engine
   // ================================================================
   useEffect(() => {
     if (!isPoseReady || !exercise || !canvasRef.current || !videoRef.current) return;
 
     const isCurl = isCurlExercise(exercise);
+    const isTree = isStaticHoldExercise(exercise);
 
     // ---- Initialise curl tracker if needed ----
     if (isCurl && !curlTrackerRef.current) {
@@ -206,12 +218,86 @@ export function ActiveWorkoutPage() {
         () => secondsRef.current
       );
     }
+    
+    // ---- Initialise tree pose tracker if needed ----
+    if (isTree && !treeTrackerRef.current) {
+       const p = exercise.personalization as any;
+       treeTrackerRef.current = createTreePoseTracker(
+          {
+            alignment_thresholds: p.alignment_thresholds,
+            hold_config: p.hold_config,
+            voice_cues: p.voice_cues,
+            voice_cue_priority: p.voice_cue_priority || [],
+            cue_cooldown_seconds: p.cue_cooldown_seconds || 8,
+            postural_flags: p.postural_flags || {},
+          },
+          speak,
+          (errorType: string, leg: string, ts: number) => {
+             sessionErrors.current.push({ error_type: errorType, timestamp: String(ts), leg });
+          },
+          () => secondsRef.current
+       );
+       setTreeTarget(p.hold_config.target_hold_seconds || 0);
+    }
 
     const stopPose = processPose(videoRef.current, canvasRef.current, (results) => {
       const landmarks = results.landmarks;
       const ex = exerciseRef.current;
       if (!ex || !landmarks) return;
       if (isPausedRef.current) return;
+      
+      // ---- TREE POSE ENGINE ----
+      if (isStaticHoldExercise(ex) && treeTrackerRef.current) {
+          const legsVis = isUpperLegVisible(landmarks);
+          
+          if (!legsVis) {
+             consecutiveLostFrames.current += 1;
+             if (consecutiveLostFrames.current >= LOST_THRESHOLD) {
+                setTrackingStatus('lost');
+                speak(
+                  "Full body must be visible for Tree Pose. Step back.",
+                  "tree_lost",
+                  7000
+                );
+             }
+             return;
+          }
+          
+          if (consecutiveLostFrames.current >= LOST_THRESHOLD) {
+             const newStatus = hasCalibrated.current ? 'tracking' : 'calibrating';
+             setTrackingStatus(newStatus);
+             trackingStatusRef.current = newStatus;
+          }
+          consecutiveLostFrames.current = 0;
+          
+          if (!hasCalibrated.current) {
+             // For tree pose, we don't have deep calibration right now, just visibility
+             setTrackingStatus('tracking');
+             hasCalibrated.current = true;
+             const pers = ex.personalization as any;
+             speakImmediate(`Welcome to ${pers['hold_config']?.variant_name || 'Tree Pose'}. ${pers['hold_config']?.safety_note || "Let's begin."}`);
+          }
+          
+          const tracker = treeTrackerRef.current;
+          const result = tracker.processFrame(landmarks, performance.now());
+          
+          setTreeHoldLeft(result.leftLeg.holdSeconds);
+          setTreeHoldRight(result.rightLeg.holdSeconds);
+          setTreeActiveLeg(result.activeLeg);
+          
+          // isHolding is true if ANY active leg is holding accurately
+          const isHolding = (result.activeLeg === 'left' && result.leftLeg.isHolding) || 
+                            (result.activeLeg === 'right' && result.rightLeg.isHolding);
+          setTreeIsHolding(isHolding);
+          
+          if (result.isComplete) {
+              // Both legs complete
+              // handleFinish will be called manually or we can auto-end.
+              // We'll let the user end manually for now like other exercises.
+          }
+          
+          return;
+      }
 
       // ---- CURL ENGINE ----
       if (isCurlExercise(ex) && curlTrackerRef.current) {
@@ -467,7 +553,7 @@ export function ActiveWorkoutPage() {
               setReps(r => r + 1);
               repState.current = 'waiting_for_top';
               const praises = ['Perfect!', 'Great rep!', 'Keep going!', 'Excellent!', 'Nice work!'];
-              speakImmediate(praises[Math.floor(Math.random() * praises.length)]);
+              speakImmediate(praises[Math.floor(Math.random() * praises.length)]!);
             } else {
               // Didn't reach valid bottom — alert user why rep wasn't counted
               repState.current = 'ready';
@@ -526,7 +612,7 @@ export function ActiveWorkoutPage() {
   };
 
   // ================================================================
-  // FINISH — builds payload for both squat and curl
+  // FINISH — builds payload for squat, curl, or tree pose
   // ================================================================
   const handleFinish = async () => {
     if (!exercise) return;
@@ -534,12 +620,14 @@ export function ActiveWorkoutPage() {
     if (videoRef.current) stopCamera(videoRef.current);
 
     const isCurl = isCurlExercise(exercise);
-    const tracker = curlTrackerRef.current;
+    const isTree = isStaticHoldExercise(exercise);
+    const cTracker = curlTrackerRef.current;
+    const tTracker = treeTrackerRef.current;
 
     // Build per-error-type error list for history
     let formErrors = sessionErrors.current;
-    if (isCurl && tracker) {
-      const errorCounts = tracker.getErrors();
+    if (isCurl && cTracker) {
+      const errorCounts = cTracker.getErrors();
       // Convert { body_swing: 3, elbow_swing: 1 } → flat list matching existing history format
       const errorList = Object.entries(errorCounts).flatMap(([type, count]) =>
         Array.from({ length: count }, (_, i) => ({
@@ -548,29 +636,53 @@ export function ActiveWorkoutPage() {
         }))
       );
       formErrors = errorList;
+    } else if (isTree && tTracker) {
+      formErrors = tTracker.getErrors() as any;
     }
 
     try {
-      await exerciseService.submitSessionSummary({
-        exercise_id: exercise.id,
-        reps_completed: reps,
-        duration_seconds: seconds,
-        form_errors: formErrors,
-        ...(isCurl && tracker ? {
-          reps_left: tracker.getCounts().left,
-          reps_right: tracker.getCounts().right,
-          goal_context: exercise.personalization.goal || '',
-        } : {}),
-      });
-      navigate("/workout/summary", {
-        state: {
-          exerciseName: exercise.name,
-          reps,
-          duration: formatTime(seconds),
-          // curl-specific extras shown on summary page
-          ...(isCurl ? { repsLeft, repsRight } : {}),
-        }
-      });
+      if (isTree && tTracker) {
+          await exerciseService.submitHoldSessionSummary({
+             exercise_id: exercise.id,
+             left_leg_hold_duration_seconds: treeHoldLeft,
+             right_leg_hold_duration_seconds: treeHoldRight,
+             target_hold_duration_seconds: treeTarget,
+             form_errors_triggered: formErrors,
+             goal_context: 'flexibility',
+             age_group: exercise.personalization.age_band,
+          });
+          navigate("/workout/summary", {
+            state: {
+              exerciseName: exercise.name,
+              reps: 0,
+              duration: formatTime(seconds),
+              isStaticHold: true,
+              treeHoldLeft,
+              treeHoldRight,
+              treeTarget
+            }
+          });
+      } else {
+          await exerciseService.submitSessionSummary({
+            exercise_id: exercise.id,
+            reps_completed: reps,
+            duration_seconds: seconds,
+            form_errors: formErrors,
+            ...(isCurl && cTracker ? {
+              reps_left: cTracker.getCounts().left,
+              reps_right: cTracker.getCounts().right,
+              goal_context: exercise.personalization.goal || '',
+            } : {}),
+          });
+          navigate("/workout/summary", {
+            state: {
+              exerciseName: exercise.name,
+              reps,
+              duration: formatTime(seconds),
+              ...(isCurl ? { repsLeft, repsRight } : {}),
+            }
+          });
+      }
     } catch (e) {
       navigate("/dashboard");
     }
@@ -604,7 +716,7 @@ export function ActiveWorkoutPage() {
             </div>
           </div>
 
-          {/* Rep counter — bilateral for curl, single for squat */}
+          {/* Rep counter / Timer UI */}
           {isCurl ? (
             <div className="flex items-center gap-3 px-4 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl">
               <div className="flex flex-col items-center">
@@ -620,6 +732,28 @@ export function ActiveWorkoutPage() {
               <div className="flex flex-col items-center">
                 <span className="text-[7px] uppercase font-black text-blue-400">R ARM</span>
                 <span className="text-lg font-black">{repsRight}</span>
+              </div>
+              <div className="w-[1px] h-4 bg-white/10" />
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] uppercase font-black text-white/40">Time</span>
+                <span className="text-xl font-mono">{formatTime(seconds)}</span>
+              </div>
+            </div>
+          ) : isStaticHoldExercise(exercise!) ? (
+            <div className="flex items-center gap-3 px-4 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl">
+              <div className="flex flex-col items-center">
+                <span className={`text-[7px] uppercase font-black ${treeActiveLeg === 'left' && treeIsHolding ? 'text-green-400' : 'text-blue-400'}`}>L LEG</span>
+                <span className="text-lg font-black">{Math.floor(treeHoldLeft)}s</span>
+              </div>
+              <div className="w-[1px] h-4 bg-white/10" />
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] uppercase font-black text-primary">TARGET</span>
+                <span className="text-xl font-black">{treeTarget}s</span>
+              </div>
+              <div className="w-[1px] h-4 bg-white/10" />
+              <div className="flex flex-col items-center">
+                <span className={`text-[7px] uppercase font-black ${treeActiveLeg === 'right' && treeIsHolding ? 'text-green-400' : 'text-blue-400'}`}>R LEG</span>
+                <span className="text-lg font-black">{Math.floor(treeHoldRight)}s</span>
               </div>
               <div className="w-[1px] h-4 bg-white/10" />
               <div className="flex flex-col items-center">
@@ -655,19 +789,26 @@ export function ActiveWorkoutPage() {
             </div>
             <div className="space-y-4">
               <h3 className="text-4xl font-black tracking-tighter uppercase italic text-white">
-                {isCurl ? 'Curl Coach' : 'Coach Mode'}
+                {isCurl ? 'Curl Coach' : isStaticHoldExercise(exercise!) ? 'Balance Coach' : 'Coach Mode'}
               </h3>
               <p className="text-neutral-500 text-sm font-medium">
                 {isCurl
                   ? (exercise?.personalization.angle_ranges.position === 'seated'
                       ? 'Sit with your back straight so I can see both arms'
                       : 'Stand back so I can see your arms and upper body')
+                  : isStaticHoldExercise(exercise!)
+                  ? 'Stand back so I can see your full body. Perform near a wall if needed.'
                   : 'Stand back so I can see your full body'
                 }
               </p>
               {isCurl && exercise?.personalization.rep_config.load_note && (
                 <p className="text-neutral-600 text-xs font-medium italic">
                   💡 {exercise.personalization.rep_config.load_note}
+                </p>
+              )}
+              {isStaticHoldExercise(exercise!) && (exercise?.personalization as any)?.hold_config?.safety_note && (
+                <p className="text-neutral-600 text-xs font-medium italic">
+                  💡 {(exercise?.personalization as any)?.hold_config?.safety_note}
                 </p>
               )}
             </div>
