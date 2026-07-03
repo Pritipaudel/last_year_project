@@ -93,8 +93,14 @@ export function HistoryPage() {
 
                           <div className="grid grid-cols-3 gap-3">
                             <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
-                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">Reps</span>
-                              <span className="text-lg font-black">{session.reps}</span>
+                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">
+                                {session.metadata?.pose_type === 'static_hold' ? 'Hold' : 'Reps'}
+                              </span>
+                              <span className="text-lg font-black">
+                                {session.metadata?.pose_type === 'static_hold'
+                                  ? `${Math.max(session.metadata.left_leg_hold_seconds || 0, session.metadata.right_leg_hold_seconds || 0)}s`
+                                  : session.reps || 0}
+                              </span>
                             </div>
                             <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
                               <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">Time</span>

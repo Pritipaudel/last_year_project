@@ -178,8 +178,10 @@ export function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-sm font-medium text-primary">
-                      {session.reps} reps
+                    <div className="text-sm font-medium text-primary text-right">
+                      {session.metadata?.pose_type === 'static_hold' 
+                        ? `${Math.max(session.metadata.left_leg_hold_seconds || 0, session.metadata.right_leg_hold_seconds || 0)}s hold`
+                        : `${session.reps || 0} reps`}
                     </div>
                   </CardContent>
                 </Card>

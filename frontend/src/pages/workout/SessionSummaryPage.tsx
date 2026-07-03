@@ -8,10 +8,13 @@ export function SessionSummaryPage() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const { exerciseName, reps, duration } = location.state || {
+  const { exerciseName, reps, duration, isStaticHold, treeHoldLeft, treeHoldRight } = location.state || {
     exerciseName: "Session",
     reps: 0,
-    duration: "00:00"
+    duration: "00:00",
+    isStaticHold: false,
+    treeHoldLeft: 0,
+    treeHoldRight: 0
   };
 
   return (
@@ -30,17 +33,40 @@ export function SessionSummaryPage() {
 
         {/* RESULTS GRID */}
         <div className="grid grid-cols-2 gap-4 w-full">
-          <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
-            <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-              <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
-                <Zap size={24} />
-              </div>
-              <div className="text-3xl font-black text-foreground">{reps}</div>
-              <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">Total Reps</div>
-            </CardContent>
-          </Card>
+          {isStaticHold ? (
+            <>
+              <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                    <Zap size={24} />
+                  </div>
+                  <div className="text-3xl font-black text-foreground">{treeHoldLeft}s</div>
+                  <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">L Leg Hold</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                    <Zap size={24} />
+                  </div>
+                  <div className="text-3xl font-black text-foreground">{treeHoldRight}s</div>
+                  <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">R Leg Hold</div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                  <Zap size={24} />
+                </div>
+                <div className="text-3xl font-black text-foreground">{reps}</div>
+                <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">Total Reps</div>
+              </CardContent>
+            </Card>
+          )}
           
-          <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+          <Card className={`${isStaticHold ? 'col-span-2' : ''} bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none`}>
             <CardContent className="p-6 flex flex-col items-center justify-center text-center">
               <div className="h-12 w-12 rounded-2xl bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center mb-4 text-blue-500">
                 <Clock size={24} />
