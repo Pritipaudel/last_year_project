@@ -8,10 +8,17 @@ export function SessionSummaryPage() {
   const navigate = useNavigate();
   const location = useLocation();
   
+<<<<<<< HEAD
   const { exerciseName, reps, duration, isStaticHold, treeHoldLeft, treeHoldRight, repsLeft, repsRight } = location.state || {
+=======
+  const { exerciseName, reps, duration, isStaticHold, treeHoldLeft, treeHoldRight } = location.state || {
+>>>>>>> flexibility/exercise
     exerciseName: "Session",
     reps: 0,
-    duration: "00:00"
+    duration: "00:00",
+    isStaticHold: false,
+    treeHoldLeft: 0,
+    treeHoldRight: 0
   };
 
   return (
@@ -29,6 +36,7 @@ export function SessionSummaryPage() {
         </div>
 
         {/* RESULTS GRID */}
+<<<<<<< HEAD
         {isStaticHold ? (
           <div className="grid grid-cols-2 gap-4 w-full">
             <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
@@ -53,6 +61,31 @@ export function SessionSummaryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 w-full">
+=======
+        <div className="grid grid-cols-2 gap-4 w-full">
+          {isStaticHold ? (
+            <>
+              <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                    <Zap size={24} />
+                  </div>
+                  <div className="text-3xl font-black text-foreground">{treeHoldLeft}s</div>
+                  <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">L Leg Hold</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                    <Zap size={24} />
+                  </div>
+                  <div className="text-3xl font-black text-foreground">{treeHoldRight}s</div>
+                  <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">R Leg Hold</div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+>>>>>>> flexibility/exercise
             <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
               <CardContent className="p-6 flex flex-col items-center justify-center text-center">
                 <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
@@ -62,6 +95,7 @@ export function SessionSummaryPage() {
                 <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">Total Reps</div>
               </CardContent>
             </Card>
+<<<<<<< HEAD
             
             <Card className="bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none">
               <CardContent className="p-6 flex flex-col items-center justify-center text-center">
@@ -74,6 +108,20 @@ export function SessionSummaryPage() {
             </Card>
           </div>
         )}
+=======
+          )}
+          
+          <Card className={`${isStaticHold ? 'col-span-2' : ''} bg-white dark:bg-neutral-900 border-none shadow-xl shadow-black/5 dark:shadow-none`}>
+            <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+              <div className="h-12 w-12 rounded-2xl bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center mb-4 text-blue-500">
+                <Clock size={24} />
+              </div>
+              <div className="text-3xl font-black text-foreground">{duration}</div>
+              <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-2 opacity-50">Duration</div>
+            </CardContent>
+          </Card>
+        </div>
+>>>>>>> flexibility/exercise
 
         <Card className="w-full bg-gradient-to-br from-primary/5 to-transparent border border-primary/10 overflow-hidden relative rounded-[2rem]">
           <div className="absolute -right-4 -top-4 h-24 w-24 bg-primary/10 rounded-full blur-3xl" />

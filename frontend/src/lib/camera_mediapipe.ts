@@ -90,22 +90,27 @@ export function processPose(
     // @ts-ignore
     if (!window.Pose) return () => {};
 
-    // Cleanup previous if exists
-    if (poseInstance || cameraInstance) {
-        stopCamera(null);
+    // @ts-ignore
+    if (!window.Pose) return () => {};
+
+    // Reuse existing Pose instance to prevent expensive model reloading
+    if (!poseInstance) {
+        // @ts-ignore
+        poseInstance = new window.Pose({
+            locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+
+        poseInstance.setOptions({
+            useCpuInference: false, 
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.55,
+            minTrackingConfidence: 0.55
+        });
     }
 
-    // @ts-ignore
-    poseInstance = new window.Pose({
-        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-    });
-
-    poseInstance.setOptions({
-        modelComplexity: 1,     // High accuracy for full-body exercise
-        smoothLandmarks: true,
-        minDetectionConfidence: 0.55,
-        minTrackingConfidence: 0.55
-    });
+    // Clear previous results callback to avoid memory leaks/double-firing
+    poseInstance.onResults(() => {}); 
 
     poseInstance.onResults((results: any) => {
         if (!ctx) return;

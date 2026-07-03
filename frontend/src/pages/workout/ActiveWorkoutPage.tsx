@@ -69,11 +69,19 @@ export function ActiveWorkoutPage() {
   const [isPoseReady, setIsPoseReady] = useState(false);
   const [trackingStatus, setTrackingStatus] = useState<'calibrating' | 'tracking' | 'lost'>('calibrating');
 
+  // ---- STATIC HOLD STATE (Tree Pose) ----
+  const [treeHoldLeft, setTreeHoldLeft] = useState(0);
+  const [treeHoldRight, setTreeHoldRight] = useState(0);
+  const [treeActiveLeg, setTreeActiveLeg] = useState<'left' | 'right' | null>(null);
+  const [treeIsHolding, setTreeIsHolding] = useState(false);
+  const [treeTarget, setTreeTarget] = useState(20);
+
   // ---- SQUAT STATE MACHINE ----
   const repState = useRef<'ready' | 'descending' | 'bottom' | 'ascending' | 'waiting_for_top'>('ready');
 
-  // ---- CURL TRACKER (only instantiated for curl exercises) ----
+  // ---- TRACKER REFS ----
   const curlTrackerRef = useRef<ReturnType<typeof createCurlTracker> | null>(null);
+  const treeTrackerRef = useRef<ReturnType<typeof createTreePoseTracker> | null>(null);
 
   // ---- TREE POSE TRACKER ----
   const treeTrackerRef = useRef<ReturnType<typeof createTreePoseTracker> | null>(null);
@@ -106,6 +114,7 @@ export function ActiveWorkoutPage() {
   const lastKnownAngle = useRef<number | null>(null);
   const consecutiveLostFrames = useRef(0);
   const LOST_THRESHOLD = 25;
+  const lastUiUpdateAt = useRef(0);
 
   // Refs so tracking callback always reads fresh values without re-subscribing
   const isPausedRef = useRef(false);
@@ -199,23 +208,34 @@ export function ActiveWorkoutPage() {
     if (!isPoseReady || !exercise || !canvasRef.current || !videoRef.current) return;
 
     const isCurl = isCurlExercise(exercise);
+<<<<<<< HEAD
     const isTree = isStaticHoldExercise(exercise);
+=======
+    const isStatic = isStaticHoldExercise(exercise);
+>>>>>>> flexibility/exercise
 
-    // ---- Initialise curl tracker if needed ----
+    // ---- Initialise trackers if needed ----
     if (isCurl && !curlTrackerRef.current) {
-      const p = exercise.personalization;
       curlTrackerRef.current = createCurlTracker(
-        {
-          angle_ranges: p.angle_ranges as any,
-          voice_cues: p.voice_cues as any,
-          voice_cue_priority: p.voice_cue_priority || [],
-          cue_cooldown_seconds: p.cue_cooldown_seconds || 8,
-        },
+        exercise as any,
         speak,
-        (errorType: string, ts: number) => {
-          sessionErrors.current.push({ error_type: errorType, timestamp: String(ts) });
+        (type: string, leg: string, ts: number) => {
+          sessionErrors.current.push({ error_type: `${leg}_${type}`, timestamp: String(ts) });
         },
-        () => secondsRef.current
+        () => Date.now()
+      );
+    }
+
+    if (isStatic && !treeTrackerRef.current) {
+      const p = exercise.personalization;
+      setTreeTarget(p.hold_config?.target_hold_seconds || 20);
+      treeTrackerRef.current = createTreePoseTracker(
+        p as any,
+        speak,
+        (type: string, leg: string, ts: number) => {
+          sessionErrors.current.push({ error_type: `${leg}_${type}`, timestamp: String(ts) });
+        },
+        () => Date.now()
       );
     }
     
@@ -299,8 +319,31 @@ export function ActiveWorkoutPage() {
           return;
       }
 
+      if (isStatic && treeTrackerRef.current) {
+        const now = Date.now();
+        const result = treeTrackerRef.current.processFrame(results.poseLandmarks, now);
+        
+        // Safety logic (handles finish) must be real-time
+        if (result.isComplete && !isPausedRef.current) {
+           handleFinish();
+           return;
+        }
+
+        // UI updates (timers) can be throttled to 10 FPS to eliminate lag
+        if (now - lastUiUpdateAt.current > 100) {
+          setTreeHoldLeft(result.leftLeg.holdSeconds);
+          setTreeHoldRight(result.rightLeg.holdSeconds);
+          setTreeActiveLeg(result.activeLeg);
+          setTreeIsHolding(result.activeLeg === 'left' ? result.leftLeg.isHolding : result.rightLeg.isHolding);
+          lastUiUpdateAt.current = now;
+        }
+        return;
+      }
+
+      const isCurl = isCurlExercise(ex);
+
       // ---- CURL ENGINE ----
-      if (isCurlExercise(ex) && curlTrackerRef.current) {
+      if (isCurl && curlTrackerRef.current) {
         const bothArmsVis = isBothArmsFullyVisible(landmarks);
 
         if (!bothArmsVis) {
@@ -326,12 +369,14 @@ export function ActiveWorkoutPage() {
 
         const tracker = curlTrackerRef.current;
 
-        // Feed EVERY frame to the tracker so calibration accumulates
         const { leftReps, rightReps, totalReps } = tracker.processFrame(results);
 
         // Wait for BOTH arms to calibrate before starting
         if (!tracker.bothCalibrated()) {
-          setTrackingStatus('calibrating');
+          if (Date.now() - lastUiUpdateAt.current > 100) {
+            setTrackingStatus('calibrating');
+            lastUiUpdateAt.current = Date.now();
+          }
           return;
         }
 
@@ -342,9 +387,13 @@ export function ActiveWorkoutPage() {
           speakImmediate("Perfect, let's start! Begin your first curl.");
         }
 
-        setRepsLeft(leftReps);
-        setRepsRight(rightReps);
-        setReps(totalReps);
+        const now = Date.now();
+        if (now - lastUiUpdateAt.current > 100) {
+          setRepsLeft(leftReps);
+          setRepsRight(rightReps);
+          setReps(totalReps);
+          lastUiUpdateAt.current = now;
+        }
         return;
       }
 
@@ -358,9 +407,6 @@ export function ActiveWorkoutPage() {
       const legsVisible = isUpperLegVisible(landmarks);
 
       // ---- VISIBILITY GATE ----
-      // Both legs must be continuously visible. Any frame without full leg
-      // visibility increments the lost counter. We only pause/reset the engine if
-      // they remain lost for a sustained period (LOST_THRESHOLD).
       if (!legsVisible) {
         consecutiveLostFrames.current += 1;
         visibleFramesCount.current = 0;
@@ -377,8 +423,6 @@ export function ActiveWorkoutPage() {
               7000
             );
           }
-          // Only hard reset the state if they've been gone for a full second
-          // This prevents tiny half-frame flickers from destroying rep counts
           if (repState.current !== 'ready' && repState.current !== 'waiting_for_top') {
             repState.current = 'ready';
             reachedBottom.current = false;
@@ -399,14 +443,11 @@ export function ActiveWorkoutPage() {
       }
 
       // ---- CALIBRATION ----
-      // Collect 25 CONSECUTIVE frames of fully extended standing (angle > 155°).
-      // Reset calibration frames if angle drops (person bent knees during calibration).
       if (!hasCalibrated.current) {
         if (angle !== null && angle > 155) {
           calibrationFrames.current += 1;
           calibrationAngles.current.push(angle);
         } else {
-          // Bent knees during calibration — reset to avoid wrong baseline
           calibrationFrames.current = Math.max(0, calibrationFrames.current - 3);
         }
         if (calibrationFrames.current >= 25) {
@@ -429,34 +470,10 @@ export function ActiveWorkoutPage() {
       // ======================================================
       // SQUAT STATE MACHINE
       // ======================================================
-      //
-      // States:
-      //   ready        → waiting for squat to begin (standing still)
-      //   descending   → knee angle decreasing, approaching bottom
-      //   bottom       → reached valid depth zone, waiting to ascend
-      //   ascending    → knee angle increasing back to standing
-      //   waiting_top  → rep counted, waiting for full stand before next rep
-      //
-      // All transitions require MULTIPLE CONSECUTIVE frames in the new zone
-      // to prevent angle noise / jitter from causing phantom transitions.
-      // ======================================================
-
-      // Standing angle calibrated. Use it + offsets for all thresholds.
       const standingAngle = calibratedStandingAngle.current!;
-
-      // ENTRY: enter 'descending' when angle drops ≥ 12° below standing
-      // Highly sensitive so shallow reps are detected and coached, not ignored.
       const descendTrigger = standingAngle - 12;
-
-      // EXIT ascending: only count rep when returns to within 12° of standing
-      // (ensures they actually stood back up, not just partially)
       const completeTrigger = standingAngle - 12;
-
-      // RESET: reset to ready once back within 6° of standing
       const resetTrigger = standingAngle - 6;
-
-      // Depth zone: Use config from backend, but bound by (standing - 55°) to be robust
-      // against different camera angles/calibration heights. 55° drop is a solid squat limit.
       const bottomMax = Math.max((thresholds as any).bottom_max ?? 90, standingAngle - 60);
       const tooDeepThreshold = (thresholds as any).too_deep_threshold ?? 50;
 
@@ -470,12 +487,10 @@ export function ActiveWorkoutPage() {
           bottomHoldFrames.current = 0;
           ascendingFrames.current = 0;
           currentRepErrors.current = [];
-          // Clear per-rep cooldowns
           delete lastSpokeAt.current['go_lower'];
           delete lastSpokeAt.current['a_little_more'];
           delete lastSpokeAt.current['insufficient'];
         }
-        // Standing still: no feedback
       }
 
       // ---- STATE: descending ----
@@ -484,22 +499,16 @@ export function ActiveWorkoutPage() {
         if (effectiveAngle < minAngleInRep.current) minAngleInRep.current = effectiveAngle;
 
         if (effectiveAngle < bottomMax) {
-          // Reached valid bottom zone — transition to bottom
           repState.current = 'bottom';
           reachedBottom.current = true;
           bottomHoldFrames.current = 1;
           speakImmediate("Good depth!");
         }
 
-        // Abort / early reversal detection: angle rose significantly after a descent attempt
-        // We track a 15° rise from the lowest point they reached to confirm they are coming back up
         if (effectiveAngle > minAngleInRep.current + 15) {
-          // They reversed up BEFORE hitting bottomMax
           if (minAngleInRep.current > standingAngle - 18) {
-            // Literally shivering/twitching — silently reset
             repState.current = 'ready';
           } else {
-            // A real attempt but didn't reach bottom — coach them based on how short they were
             const gap = effectiveAngle - bottomMax;
             if (gap > 40) {
               speak("Try to go lower next time.", "go_lower", 5000);
@@ -525,7 +534,6 @@ export function ActiveWorkoutPage() {
         bottomHoldFrames.current += 1;
         if (effectiveAngle < minAngleInRep.current) minAngleInRep.current = effectiveAngle;
 
-        // Too deep warning (only fire once per rep, after holding 3 frames)
         if (bottomHoldFrames.current >= 3 && effectiveAngle < tooDeepThreshold) {
           speak(
             (cues as any).excessive_depth || "That's deep enough, start coming up.",
@@ -534,8 +542,6 @@ export function ActiveWorkoutPage() {
           );
         }
 
-        // Exit bottom: must have held for ≥3 frames AND angle rose ≥20° from min
-        // This prevents jitter (random 5° spike) from ending the bottom state
         if (bottomHoldFrames.current >= 3 && effectiveAngle > minAngleInRep.current + 20) {
           repState.current = 'ascending';
           ascendingFrames.current = 0;
@@ -547,7 +553,6 @@ export function ActiveWorkoutPage() {
         ascendingFrames.current += 1;
 
         if (effectiveAngle > completeTrigger) {
-          // Must hold completeTrigger for ≥3 consecutive frames (not a jitter spike)
           if (ascendingFrames.current >= 3) {
             if (reachedBottom.current) {
               setReps(r => r + 1);
@@ -555,14 +560,11 @@ export function ActiveWorkoutPage() {
               const praises = ['Perfect!', 'Great rep!', 'Keep going!', 'Excellent!', 'Nice work!'];
               speakImmediate(praises[Math.floor(Math.random() * praises.length)]!);
             } else {
-              // Didn't reach valid bottom — alert user why rep wasn't counted
               repState.current = 'ready';
               speakImmediate("Rep not counted. Make sure to go deeper.");
             }
           }
         } else if (effectiveAngle < minAngleInRep.current - 10) {
-          // Angle dropped again during ascent — they went back down
-          // Update minAngle and return to bottom state
           repState.current = 'bottom';
           if (effectiveAngle < minAngleInRep.current) minAngleInRep.current = effectiveAngle;
           bottomHoldFrames.current = 0;
@@ -570,30 +572,25 @@ export function ActiveWorkoutPage() {
       }
 
       // ---- STATE: waiting_for_top ----
-      // Rep already counted. Wait for person to fully stand before allowing next rep.
       else if (repState.current === 'waiting_for_top') {
         if (effectiveAngle > resetTrigger) {
           repState.current = 'ready';
         }
       }
 
-      // ---- SPINE / CHEST CUE ----
-      // Only fire during active movement (descending or ascending), not while standing.
-      // Dropped threshold to < 55° (very extreme lean) as normal back squats naturally involve forward torso lean.
-      // 8-second cooldown prevents it repeating every 5 seconds.
       if (
         (repState.current === 'descending' || repState.current === 'bottom' || repState.current === 'ascending') &&
         spineAngle !== null &&
         spineAngle < 55
       ) {
-        speak((cues as any).forward_lean || 'Keep your chest up.', 'spine', 8000);
+        speak(((cues as any).forward_lean as string) || 'Keep your chest up.', 'spine', 8000);
       }
     });
 
     return () => {
       if (stopPose) stopPose();
     };
-  }, [isPoseReady]); // Run once when pose is ready
+  }, [isPoseReady]);
 
   // ================================================================
   // CLEANUP
@@ -620,6 +617,7 @@ export function ActiveWorkoutPage() {
     if (videoRef.current) stopCamera(videoRef.current);
 
     const isCurl = isCurlExercise(exercise);
+<<<<<<< HEAD
     const isTree = isStaticHoldExercise(exercise);
     const cTracker = curlTrackerRef.current;
     const tTracker = treeTrackerRef.current;
@@ -683,6 +681,63 @@ export function ActiveWorkoutPage() {
             }
           });
       }
+=======
+    const isStatic = isStaticHoldExercise(exercise);
+
+    try {
+      if (isStatic) {
+        await exerciseService.submitHoldSessionSummary({
+          exercise_id: exercise.id,
+          left_leg_hold_duration_seconds: treeHoldLeft,
+          right_leg_hold_duration_seconds: treeHoldRight,
+          target_hold_duration_seconds: treeTarget,
+          form_errors_triggered: sessionErrors.current,
+        });
+        navigate("/workout/summary", {
+          state: {
+            exerciseName: exercise.name,
+            isStaticHold: true,
+            treeHoldLeft: Math.floor(treeHoldLeft),
+            treeHoldRight: Math.floor(treeHoldRight),
+            duration: formatTime(seconds),
+          }
+        });
+        return;
+      }
+
+      const tracker = curlTrackerRef.current;
+      let formErrors = sessionErrors.current;
+      if (isCurl && tracker) {
+        const errorCounts = tracker.getErrors();
+        const errorList = Object.entries(errorCounts).flatMap(([type, count]) =>
+          Array.from({ length: count as number }, (_, i) => ({
+            error_type: type,
+            timestamp: String(i),
+          }))
+        );
+        formErrors = errorList;
+      }
+
+      await exerciseService.submitSessionSummary({
+        exercise_id: exercise.id,
+        reps_completed: reps,
+        duration_seconds: seconds,
+        form_errors: formErrors,
+        ...(isCurl && tracker ? {
+          reps_left: tracker.getCounts().left,
+          reps_right: tracker.getCounts().right,
+          goal_context: (exercise.personalization as any).goal || '',
+        } : {}),
+      });
+      navigate("/workout/summary", {
+        state: {
+          exerciseName: exercise.name,
+          reps,
+          duration: formatTime(seconds),
+          ...(isCurl ? { repsLeft, repsRight } : {}),
+        }
+      });
+>>>>>>> flexibility/exercise
     } catch (e) {
       navigate("/dashboard");
     }
@@ -691,6 +746,7 @@ export function ActiveWorkoutPage() {
   if (isLoading) return <LoadingSpinner fullScreen />;
 
   const isCurl = exercise ? isCurlExercise(exercise) : false;
+  const isStatic = exercise ? isStaticHoldExercise(exercise) : false;
 
   return (
     <PageTransition variant="fade" className="fixed inset-0 z-[100] flex flex-col bg-black text-white overflow-hidden">
@@ -739,7 +795,11 @@ export function ActiveWorkoutPage() {
                 <span className="text-xl font-mono">{formatTime(seconds)}</span>
               </div>
             </div>
+<<<<<<< HEAD
           ) : isStaticHoldExercise(exercise!) ? (
+=======
+          ) : isStatic ? (
+>>>>>>> flexibility/exercise
             <div className="flex items-center gap-3 px-4 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl">
               <div className="flex flex-col items-center">
                 <span className={`text-[7px] uppercase font-black ${treeActiveLeg === 'left' && treeIsHolding ? 'text-green-400' : 'text-blue-400'}`}>L LEG</span>
