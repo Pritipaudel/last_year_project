@@ -3,6 +3,7 @@ from .views import (
     PersonalizedExerciseListView,
     PersonalizedExerciseDetailView,
     SessionSummaryCreateView,
+    HoldSessionSummaryCreateView,
     WorkoutSessionListView,
 )
 
@@ -10,5 +11,6 @@ urlpatterns = [
     path('', PersonalizedExerciseListView.as_view(), name='exercise-list'),
     path('<int:pk>/', PersonalizedExerciseDetailView.as_view(), name='exercise-detail'),
     path('session/', SessionSummaryCreateView.as_view(), name='session-summary'),
+    path('session/hold/', HoldSessionSummaryCreateView.as_view(), name='hold-session-create'),
     path('sessions/', WorkoutSessionListView.as_view(), name='session-list'),
 ]

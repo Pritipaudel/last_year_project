@@ -260,6 +260,220 @@ EXERCISES = [
             },
         },
     },
+
+    # ------------------------------------------------------------------
+    # TREE POSE (VRKSASANA) — Static Hold Exercise (flexibility only)
+    #
+    # pose_type = "static_hold" — returned in the API response by services.py.
+    # The frontend checks pose_type and runs the hold timer instead of a
+    # rep counter (see tree_pose_tracking.ts).
+    #
+    # goal_tags = ["flexibility"] — Tree Pose is flexibility goal ONLY.
+    #   No goal nesting inside age bands (only one goal applies).
+    #
+    # angle_ranges: REPURPOSED to store ALIGNMENT THRESHOLDS:
+    #   standing_knee_min_angle   — standing leg knee angle must EXCEED this (degrees)
+    #   hip_levelness_threshold   — abs(hip_y_diff)/torso_height must STAY BELOW this
+    #   trunk_sway_threshold      — abs(shoulder_mid_x - ankle_x) must STAY BELOW this
+    #   wrist_height_symmetry_threshold — abs(wrist_y_diff) must STAY BELOW this
+    #                               (None for 60+ — hands may rest on wall)
+    #   forward_head_threshold    — nose_x offset from shoulder_mid_x must STAY BELOW this
+    #   min_hold_frames           — consecutive clean frames before hold timer starts
+    #
+    # rep_config: REPURPOSED to store HOLD CONFIG (not sets/reps) — flat structure:
+    #   target_hold_seconds       — sourced per age band for flexibility goal
+    #   foot_placement            — anatomical region raised foot rests against
+    #   foot_placement_landmark   — MediaPipe landmark used for placement detection
+    #   standing_position         — "free_standing" | "near_wall_optional" | "near_wall_mandatory"
+    #   variant_name              — human-readable pose variant per band
+    #   safety_note               — displayed to user before session (None for 18-25/26-40)
+    #   grace_period_seconds      — seconds before hold fully resets after form breaks (always 3)
+    #
+    # Sources:
+    #   Hold durations:
+    #     18-25: Magnusson et al. (1996) Scand J Med Sci Sports; Yoga Alliance 200hr standard.
+    #     26-40: ACE Yoga Science Guide (2020) — lower bound of 20-45s flexibility range.
+    #     41-60: Fragala et al. (2019) J Strength Cond Res 33(8) — NSCA Position Statement.
+    #     60+:   Robertson et al. (2003) Otago Exercise Programme; Berg Balance Scale literature.
+    #   Wall support:
+    #     41-60: Fragala et al. (2019) NSCA Position Statement — fingertip support recommended.
+    #     60+:   AGS/BGS Clinical Practice Guideline (2019); Otago Exercise Programme (2003).
+    #   Foot placement:
+    #     41-60: ACSM Exercise Testing and Prescription, 10th ed., Ch. 45; NHS physio guidelines.
+    #     60+:   AGS/BGS Guideline 2019; Otago Programme 2003 (kickstand / toe-touch).
+    #     18-25: Yoga Alliance 200hr materials — best estimate, non-peer-reviewed. Flagged.
+    #     26-40: Derived from Pollock et al. 2000 NSCA SCJ progressive balance principles. Flagged.
+    #   Alignment thresholds:
+    #     Hip levelness 0.15: Derived from Kendall et al. Muscles 5th ed. p.70-72 (5° clinical
+    #       threshold), translated to MediaPipe proportional coordinates. Best estimate. Flagged.
+    #     Trunk sway 0.08: Best estimate — no published landmark paper. Flagged.
+    # ------------------------------------------------------------------
+    {
+        "name": "Tree Pose (Vrksasana)",
+        "muscle_group": "Balance & Flexibility",
+        "difficulty": "Beginner",
+        "image_url": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&q=80",
+        "description": (
+            "A foundational yoga balance posture (Vrksasana) that builds single-leg stability, "
+            "hip flexibility, and core alignment. Stand on one leg and place the raised foot "
+            "against the inner thigh, knee, calf, or ankle depending on age band. Arms can "
+            "be held in prayer at the chest or raised overhead. Maintain even hips and a tall "
+            "spine. Hold for the target duration on each side — both legs must reach the target "
+            "for a complete set."
+        ),
+
+        # Flexibility goal only — Tree Pose is not a strength or cardio exercise.
+        "goal_tags": ["flexibility"],
+
+        # Alignment thresholds — NOT traditional joint angle ranges.
+        # All proportional values use MediaPipe's normalized 0.0–1.0 coordinate system.
+        "angle_ranges": {
+            "18-25": {
+                # Source: Standard anatomical straight knee; slightly softened from 170° to 160°
+                # because a "softly locked" knee is biomechanically safer for standing balance
+                # than a hyperextended locked knee. Consistent with yoga instruction standards.
+                "standing_knee_min_angle": 160,
+                # Source: Derived from Kendall et al. Muscles 5th ed. p.70-72:
+                # 5° pelvic obliquity = clinically significant. 0.15 ≈ this in MediaPipe coords.
+                # ⚠️ Best estimate — flag in FYP report.
+                "hip_levelness_threshold": 0.15,
+                # Source: ⚠️ Best estimate — 8% frame-width sway = obvious balance loss.
+                "trunk_sway_threshold": 0.08,
+                # Source: ⚠️ Best estimate — 6% frame-height wrist difference = obvious asymmetry.
+                "wrist_height_symmetry_threshold": 0.06,
+                # Source: ⚠️ Best estimate — 5% frame-width nose offset = visible forward head.
+                "forward_head_threshold": 0.05,
+                # 5 frames × (1/30)s ≈ 167ms noise filter — below human reaction time.
+                "min_hold_frames": 5,
+            },
+            "26-40": {
+                "standing_knee_min_angle": 160,
+                "hip_levelness_threshold": 0.15,
+                "trunk_sway_threshold": 0.08,
+                "wrist_height_symmetry_threshold": 0.06,
+                "forward_head_threshold": 0.05,
+                "min_hold_frames": 5,
+            },
+            "41-60": {
+                # Source: ACSM — slight knee flex acceptable for adults 41-60 in balance training.
+                "standing_knee_min_angle": 155,
+                "hip_levelness_threshold": 0.15,
+                # Wider sway tolerance — reduced proprioception → more natural trunk movement.
+                "trunk_sway_threshold": 0.10,
+                "wrist_height_symmetry_threshold": 0.08,
+                "forward_head_threshold": 0.07,
+                "min_hold_frames": 4,
+            },
+            "60+": {
+                "standing_knee_min_angle": 150,
+                # Tighter hip threshold — small asymmetry meaningfully increases fall risk.
+                "hip_levelness_threshold": 0.12,
+                "trunk_sway_threshold": 0.12,
+                # Arms check disabled for 60+ — hands may rest on wall (None = skip check).
+                "wrist_height_symmetry_threshold": None,
+                "forward_head_threshold": 0.08,
+                "min_hold_frames": 3,
+            },
+        },
+
+        # Hold config per age band — replaces traditional sets/reps for static hold exercises.
+        "rep_config": {
+            "18-25": {
+                # Source: Magnusson et al. (1996) — 30s minimum for proprioceptive adaptation;
+                # Yoga Alliance 200hr — 30-60s target hold for flexibility-oriented practice.
+                "target_hold_seconds": 30,
+                "foot_placement": "inner_thigh",
+                "foot_placement_landmark": "hip",
+                "standing_position": "free_standing",
+                "variant_name": "Full Tree Pose",
+                "safety_note": None,
+                "grace_period_seconds": 3,
+            },
+            "26-40": {
+                # Source: ACE Yoga Science Guide (2020) — lower bound of 20-45s range.
+                "target_hold_seconds": 20,
+                "foot_placement": "inner_knee",
+                "foot_placement_landmark": "knee",
+                "standing_position": "free_standing",
+                "variant_name": "Modified Tree Pose",
+                "safety_note": None,
+                "grace_period_seconds": 3,
+            },
+            "41-60": {
+                # Source: Fragala et al. (2019) JSCR 33(8) NSCA Position Statement —
+                # 10-30s static balance holds recommended; 15s is the accessible midpoint.
+                "target_hold_seconds": 15,
+                "foot_placement": "lower_calf_or_ankle",
+                "foot_placement_landmark": "ankle",
+                "standing_position": "near_wall_optional",
+                "variant_name": "Low Tree Pose",
+                "safety_note": (
+                    "Consider performing near a wall for light fingertip support. "
+                    "NSCA (2019) recommends wall support during balance training for adults over 40."
+                ),
+                "grace_period_seconds": 3,
+            },
+            "60+": {
+                # Source: Robertson et al. (2003) Otago Exercise Programme;
+                # AGS/BGS Clinical Practice Guideline (2019) — 10s single-leg stance
+                # is a meaningful clinical benchmark and safe entry point.
+                "target_hold_seconds": 10,
+                "foot_placement": "kickstand_ankle_touch",
+                "foot_placement_landmark": "ankle",
+                "standing_position": "near_wall_mandatory",
+                "variant_name": "Kickstand Tree Pose",
+                "safety_note": (
+                    "Perform near a wall at all times. Place your toes on the floor with "
+                    "your heel resting lightly against your standing ankle."
+                ),
+                "grace_period_seconds": 3,
+            },
+        },
+
+        # Voice cues per age band per error type.
+        # Priority enforced by services.py _personalize() for is_static_hold branch:
+        #   P1 — trunk_sway    (safety: fires immediately on first occurrence, no cooldown)
+        #   P2 — hip_unlevel, knee_bent, [forward_head if postural flag is set]
+        #   P3 — foot_too_low, arms_asymmetric, forward_head (default position)
+        # Tone:
+        #   18-25 / 26-40 : direct coaching
+        #   41-60          : calm instructional
+        #   60+            : gentle and encouraging
+        "voice_cues": {
+            "18-25": {
+                "trunk_sway":      "You are losing balance — ground through your standing foot right now.",
+                "hip_unlevel":     "Level your hips — you are tilting. Engage your core and even them out.",
+                "knee_bent":       "Straighten your standing leg — keep the knee softly locked.",
+                "foot_too_low":    "Raise your foot higher — bring it up towards your inner thigh.",
+                "arms_asymmetric": "Even out your arms — bring both hands to the same height.",
+                "forward_head":    "Pull your chin back — stack your head directly over your shoulders.",
+            },
+            "26-40": {
+                "trunk_sway":      "Re-centre your balance — press your weight through your standing foot.",
+                "hip_unlevel":     "Level your hips — they are tilting to one side. Adjust your stance.",
+                "knee_bent":       "Straighten your standing leg to build stability in the pose.",
+                "foot_too_low":    "Try to bring your foot a little higher for the full position.",
+                "arms_asymmetric": "Try to bring your hands to an even height.",
+                "forward_head":    "Gently draw your chin in and lift the crown of your head.",
+            },
+            "41-60": {
+                "trunk_sway":      "Re-find your centre — press firmly through your standing foot.",
+                "hip_unlevel":     "Try to bring your hips level — gently adjust your stance.",
+                "knee_bent":       "Try to straighten your standing leg gently.",
+                "foot_too_low":    "Try placing your foot a little higher if it feels comfortable.",
+                "arms_asymmetric": "Try to even your hands to a comfortable height.",
+                "forward_head":    "Gently draw your chin back and lengthen through the top of your head.",
+            },
+            "60+": {
+                "trunk_sway":      "Reach out and touch the wall — steady yourself slowly, take your time.",
+                "hip_unlevel":     "Take your time, softly bring your hips level — use the wall if needed.",
+                "knee_bent":       "Gently ease your standing leg a little straighter when you feel ready.",
+                "foot_too_low":    "No rush — your foot is comfortable where it is. Hold steady.",
+                "arms_asymmetric": "Softly adjust your hands to a comfortable and level position.",
+                "forward_head":    "Softly bring your chin back and feel tall through the top of your head.",
+            },
+        },
+    },
 ]
 
 

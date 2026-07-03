@@ -151,8 +151,64 @@ def _personalize(user, exercise: Exercise, band: str, goal_tag: str) -> dict:
         'knee_tracking',
     ]
 
-    # Detect curl exercise by name so we can apply curl-specific priority ordering
+    # Pre-fetch postural flags for cue priority adjustments
+    deviations = {}
+    try:
+        profile = user.biometric_profile
+        flags = _get_postural_flags(profile)
+        deviations = flags.get('deviations', {})
+    except Exception:
+        pass
+
+    is_static_hold = 'tree' in exercise.name.lower() or 'vrksasana' in exercise.name.lower()
     is_curl = 'curl' in exercise.name.lower()
+
+    if is_static_hold:
+        priority_order = [
+            'trunk_sway',        # P1 — safety, fire immediately
+            'hip_unlevel',       # P2 — form
+            'knee_bent',         # P2 — form
+            'foot_too_low',      # P3 — alignment
+            'arms_asymmetric',   # P3 — alignment
+            'forward_head',      # P3 — alignment (elevates to P2 if flagged)
+        ]
+
+        if deviations.get('forward_head') or deviations.get('rounded_shoulders'):
+            priority_order.remove('forward_head')
+            priority_order.insert(2, 'forward_head')  # Insert at P2 position
+
+        band_cues_prioritised = {k: band_cues_raw.get(k, '') for k in priority_order}
+
+        band_hold_config = exercise.rep_config.get(band, {
+            'target_hold_seconds': 20,
+            'foot_placement': 'ankle',
+            'standing_position': 'free_standing',
+            'variant_name': 'Tree Pose',
+            'safety_note': None,
+            'grace_period_seconds': 3,
+        })
+
+        return {
+            'id': exercise.id,
+            'name': exercise.name,
+            'muscle_group': exercise.muscle_group,
+            'difficulty': exercise.difficulty,
+            'image_url': exercise.image_url,
+            'description': exercise.description,
+            'goal_tags': exercise.goal_tags,
+            'pose_type': 'static_hold',
+            'personalization': {
+                'age_band': band,
+                'goal': 'flexibility',
+                'user_name': getattr(user, 'first_name', user.username),
+                'alignment_thresholds': band_angles,
+                'hold_config': band_hold_config,
+                'voice_cues': band_cues_prioritised,
+                'voice_cue_priority': priority_order,
+                'cue_cooldown_seconds': 8,
+                'postural_flags': deviations,
+            },
+        }
 
     if is_curl:
         # Safety-first priority order for bicep curl (see implementation plan Step 5)
@@ -164,18 +220,9 @@ def _personalize(user, exercise: Exercise, band: str, goal_tag: str) -> dict:
             'incomplete_extension', # P5 — form quality
         ]
 
-        # Optionally read postural flags to elevate shoulder_elevation priority
-        try:
-            profile = user.biometric_profile
-            flags = _get_postural_flags(profile)
-            deviations = flags.get('deviations', {})
-            # If postural assessment flagged rounded shoulders or shoulder asymmetry,
-            # elevate shoulder_elevation to P1 — most important correction to make.
-            if deviations.get('rounded_shoulders') or deviations.get('shoulder_asymmetry'):
-                priority_order.remove('shoulder_elevation')
-                priority_order.insert(0, 'shoulder_elevation')
-        except Exception:
-            pass  # No profile — keep default priority order
+        if deviations.get('rounded_shoulders') or deviations.get('shoulder_asymmetry'):
+            priority_order.remove('shoulder_elevation')
+            priority_order.insert(0, 'shoulder_elevation')
 
     band_cues_prioritised = {k: band_cues_raw.get(k, default_cues.get(k, '')) for k in priority_order}
 

@@ -6,6 +6,7 @@ from .services import get_personalized_exercises, get_personalized_exercise_deta
 from .serializers import (
     PersonalizedExerciseSerializer, 
     SessionSummarySerializer,
+    HoldSessionSummarySerializer,
     WorkoutSessionSerializer
 )
 from .models import WorkoutSession, Exercise
@@ -61,3 +62,20 @@ class WorkoutSessionListView(APIView):
         sessions = WorkoutSession.objects.filter(user=request.user).order_by('-created_at')[:10]
         serializer = WorkoutSessionSerializer(sessions, many=True)
         return Response(serializer.data)
+
+
+class HoldSessionSummaryCreateView(APIView):
+    """
+    POST /api/exercises/session/hold/
+    Receives the hold duration summary from the frontend for static hold exercises
+    (Tree Pose, etc.). Creates WorkoutSession + ExerciseLog with hold-specific metadata.
+    """
+    def post(self, request):
+        serializer = HoldSessionSummarySerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            result = serializer.create(serializer.validated_data)
+            return Response(result, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
