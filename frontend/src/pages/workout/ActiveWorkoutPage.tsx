@@ -182,7 +182,7 @@ export function ActiveWorkoutPage() {
 
     if (isCurl && !curlTrackerRef.current) {
       curlTrackerRef.current = createCurlTracker(
-        exercise as any,
+        exercise.personalization as any,
         speak,
         (errorType: string, timestampSeconds: number) => {
           sessionErrors.current.push({ error_type: errorType, timestamp: String(timestampSeconds) });
