@@ -212,7 +212,7 @@ export function ActiveWorkoutPage() {
 
       if (isStatic && treeTrackerRef.current) {
         const now = Date.now();
-        const result = treeTrackerRef.current.processFrame(results.poseLandmarks, now);
+        const result = treeTrackerRef.current.processFrame(landmarks, now);
         
         if (result.isComplete && !isPausedRef.current) {
            handleFinish();
