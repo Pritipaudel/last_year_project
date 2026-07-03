@@ -78,12 +78,15 @@ export interface Exercise {
   imageUrl: string;
   description: string;
   goal_tags: string[];
-<<<<<<< HEAD
-  pose_type?: string;
-=======
   pose_type?: 'rep_based' | 'static_hold';
->>>>>>> flexibility/exercise
   personalization: ExercisePersonalization;
+}
+
+export interface FormError {
+  error_type: string;
+  count?: number;
+  timestamp?: string;
+  leg?: string;
 }
 
 export interface HoldSessionSummaryPayload {
@@ -94,13 +97,6 @@ export interface HoldSessionSummaryPayload {
   form_errors_triggered: FormError[];
   goal_context?: string;
   age_group?: string;
-}
-
-export interface FormError {
-  error_type: string;
-  count?: number;
-  timestamp?: string;
-  leg?: string;
 }
 
 export interface SessionSummaryPayload {
@@ -111,16 +107,6 @@ export interface SessionSummaryPayload {
   reps_left?: number;
   reps_right?: number;
   goal_context?: string;
-}
-
-export interface HoldSessionSummaryPayload {
-  exercise_id: number;
-  left_leg_hold_duration_seconds: number;
-  right_leg_hold_duration_seconds: number;
-  target_hold_duration_seconds: number;
-  form_errors_triggered: FormError[];
-  goal_context?: string;
-  age_group?: string;
 }
 
 export interface WorkoutSession {
@@ -146,18 +132,14 @@ function normaliseExercise(raw: any): Exercise {
 }
 
 // ----------------------------------------------------------------
-// Helper: determine if an exercise is curl-style
+// Helpers
 // ----------------------------------------------------------------
 export function isCurlExercise(exercise: Exercise): boolean {
   return exercise.name.toLowerCase().includes('curl');
 }
 
 export function isStaticHoldExercise(exercise: Exercise): boolean {
-<<<<<<< HEAD
-  return exercise.pose_type === 'static_hold';
-=======
   return exercise.pose_type === 'static_hold' || exercise.name.toLowerCase().includes('tree');
->>>>>>> flexibility/exercise
 }
 
 // ----------------------------------------------------------------
@@ -190,17 +172,6 @@ export const exerciseService = {
 
   submitHoldSessionSummary: async (payload: HoldSessionSummaryPayload): Promise<any> => {
     const { data } = await api.post("exercises/session/hold/", payload);
-<<<<<<< HEAD
-    return data;
-  },
-
-  /**
-   * Fetch the authenticated user's workout session history.
-   */
-  getSessions: async (): Promise<WorkoutSession[]> => {
-    const { data } = await api.get("exercises/sessions/");
-=======
->>>>>>> flexibility/exercise
     return data;
   },
 };
