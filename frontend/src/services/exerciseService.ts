@@ -58,6 +58,10 @@ export interface ExercisePersonalization {
   goal: string;
   angle_ranges: AngleRange;
   rep_config: RepConfig;
+  // Static hold specifics
+  alignment_thresholds?: any;
+  hold_config?: any;
+  postural_flags?: any;
   voice_cues: VoiceCues;
   voice_cue_priority: string[];
   cue_cooldown_seconds: number;
@@ -68,13 +72,13 @@ export interface Exercise {
   id: number;
   name: string;
   muscle_group: string;
-  muscleGroup: string; // camelCase alias for UI components
+  muscleGroup: string;
   difficulty: "Beginner" | "Intermediate" | "Advanced";
   image_url: string;
-  imageUrl: string; // camelCase alias for UI components
+  imageUrl: string;
   description: string;
   goal_tags: string[];
-  pose_type?: string;
+  pose_type?: 'rep_based' | 'static_hold';
   personalization: ExercisePersonalization;
 }
 
@@ -85,18 +89,6 @@ export interface FormError {
   leg?: string;
 }
 
-export interface SessionSummaryPayload {
-  exercise_id: number;
-  reps_completed: number;
-  duration_seconds: number;
-  form_errors: FormError[];
-  // Optional per-arm data for bilateral exercises
-  reps_left?: number;
-  reps_right?: number;
-  // Optional goal context
-  goal_context?: string;
-}
-
 export interface HoldSessionSummaryPayload {
   exercise_id: number;
   left_leg_hold_duration_seconds: number;
@@ -105,6 +97,16 @@ export interface HoldSessionSummaryPayload {
   form_errors_triggered: FormError[];
   goal_context?: string;
   age_group?: string;
+}
+
+export interface SessionSummaryPayload {
+  exercise_id: number;
+  reps_completed: number;
+  duration_seconds: number;
+  form_errors: FormError[];
+  reps_left?: number;
+  reps_right?: number;
+  goal_context?: string;
 }
 
 export interface WorkoutSession {
@@ -124,39 +126,31 @@ export interface WorkoutSession {
 function normaliseExercise(raw: any): Exercise {
   return {
     ...raw,
-    // camelCase aliases so existing UI components (ExerciseSelectionPage etc.)
-    // continue to work without changes
     muscleGroup: raw.muscle_group,
     imageUrl: raw.image_url,
   };
 }
 
 // ----------------------------------------------------------------
-// Helper: determine if an exercise is curl-style
+// Helpers
 // ----------------------------------------------------------------
 export function isCurlExercise(exercise: Exercise): boolean {
   return exercise.name.toLowerCase().includes('curl');
 }
 
 export function isStaticHoldExercise(exercise: Exercise): boolean {
-  return exercise.pose_type === 'static_hold';
+  return exercise.pose_type === 'static_hold' || exercise.name.toLowerCase().includes('tree');
 }
 
 // ----------------------------------------------------------------
 // Service
 // ----------------------------------------------------------------
 export const exerciseService = {
-  /**
-   * Fetch the personalised exercise list for the authenticated user.
-   */
   getExercises: async (): Promise<Exercise[]> => {
     const { data } = await api.get("exercises/");
     return (data as any[]).map(normaliseExercise);
   },
 
-  /**
-   * Fetch a single exercise with thresholds already adjusted for this user.
-   */
   getExerciseById: async (id: string | number): Promise<Exercise | null> => {
     try {
       const { data } = await api.get(`exercises/${id}/`);
@@ -166,10 +160,11 @@ export const exerciseService = {
     }
   },
 
-  /**
-   * POST session results after a live tracking set completes.
-   * Accepts optional reps_left/reps_right for bilateral exercises.
-   */
+  getSessions: async (): Promise<WorkoutSession[]> => {
+    const { data } = await api.get("exercises/sessions/");
+    return data;
+  },
+
   submitSessionSummary: async (payload: SessionSummaryPayload): Promise<any> => {
     const { data } = await api.post("exercises/session/", payload);
     return data;
@@ -177,14 +172,6 @@ export const exerciseService = {
 
   submitHoldSessionSummary: async (payload: HoldSessionSummaryPayload): Promise<any> => {
     const { data } = await api.post("exercises/session/hold/", payload);
-    return data;
-  },
-
-  /**
-   * Fetch the authenticated user's workout session history.
-   */
-  getSessions: async (): Promise<WorkoutSession[]> => {
-    const { data } = await api.get("exercises/sessions/");
     return data;
   },
 };
