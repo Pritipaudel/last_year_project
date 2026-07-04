@@ -110,7 +110,7 @@ export function GoalSelectionPage() {
       <div className="pt-8 flex justify-between border-t border-border mt-auto">
         <Button variant="ghost" onClick={() => navigate(-1)}>
           <ArrowLeft size={16} strokeWidth={2.5}></ArrowLeft>
-          <span>Back</span>
+          <span className="px-2">Back</span>
         </Button>
         <Button 
           onClick={handleContinue}
