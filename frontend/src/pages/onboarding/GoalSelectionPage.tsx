@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dumbbell, Scale, StretchHorizontal, Activity, Stethoscope, Lock } from "lucide-react";
+import { Dumbbell, Scale, StretchHorizontal, Activity, Stethoscope, Lock,Check,ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -41,8 +41,8 @@ export function GoalSelectionPage() {
   };
 
   return (
-    <PageTransition variant="slide" className="flex flex-col h-full">
-      <div className="mb-6">
+    <PageTransition variant="slide" className="flex flex-col h-full ">
+      <div className="mb-6 text-center">
         <h2 className="text-2xl font-bold text-foreground mb-2">Select Your Goal</h2>
         <p className="text-muted-foreground">What is your primary focus right now?</p>
       </div>
@@ -70,16 +70,16 @@ export function GoalSelectionPage() {
                     isLocked && "opacity-75 cursor-not-allowed"
                   )}
                   style={{
-                    borderColor: isSelected ? '#4682B4' : isLocked ? '#F59E0B' : '#E2E8F0',
-                    background: isSelected ? 'rgba(70, 130, 180, 0.05)' : isLocked ? 'rgba(245, 158, 11, 0.04)' : '#FFFFFF',
+                    borderColor: isSelected ? 'var(--accent-text)' : isLocked ? 'var(--coral-text)' : 'var(--border-card)',
+                    background: isSelected ? 'var(--accent-surface)' : isLocked ? 'var(--coral-surface)' : 'var(--bg-card)',
                   }}
                 >
                   <div className="flex items-center gap-4">
                     <div
                       className="flex justify-center items-center h-12 w-12 rounded-full flex-shrink-0"
                       style={{
-                        background: isSelected ? '#4682B4' : isLocked ? '#FEF3C7' : '#F1F5F9',
-                        color: isSelected ? '#FFFFFF' : isLocked ? '#D97706' : '#64748B',
+                        background: isSelected ? 'var(--primary-solid)' : isLocked ? 'var(--coral-surface)' : 'var(--border-card)',
+                        color: isSelected ? 'var(--bg-card)' : isLocked ? 'var(--coral-text)' : 'var(--text-muted)',
                       }}
                     >
                       <Icon className="h-6 w-6" />
@@ -91,6 +91,14 @@ export function GoalSelectionPage() {
                       </h3>
                       <p className="text-sm text-muted-foreground">{goal.description}</p>
                     </div>
+                    {isSelected && !isLocked && (
+                    <div 
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white"
+                      style={{ background: 'var(--primary-solid)' }}
+                    >
+                      <Check size={14} strokeWidth={3} />
+                    </div>
+                  )}
                   </div>
                 </Card>
               </motion.div>
@@ -101,14 +109,17 @@ export function GoalSelectionPage() {
 
       <div className="pt-8 flex justify-between border-t border-border mt-auto">
         <Button variant="ghost" onClick={() => navigate(-1)}>
-          Back
+          <ArrowLeft size={16} strokeWidth={2.5}></ArrowLeft>
+          <span>Back</span>
         </Button>
         <Button 
           onClick={handleContinue}
           disabled={!selectedGoal || isSaving}
           isLoading={isSaving}
+          className="h-12 px-6 rounded-full bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] text-white font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
         >
-          Complete Setup
+          <span>Complete Setup</span>
+          <Check size={16} strokeWidth={2.5}></Check>
         </Button>
       </div>
     </PageTransition>
