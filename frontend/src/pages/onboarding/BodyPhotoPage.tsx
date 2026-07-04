@@ -119,17 +119,17 @@ export function BodyPhotoPage() {
   }, []);
 
   return (
-    <PageTransition variant="slide" className="flex flex-col h-full overflow-y-auto pb-10">
+    <PageTransition variant="slide" className="flex flex-col h-full overflow-y-auto pb-10 bg-[var(--bg-dashboard)]">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-foreground mb-2">Posture Scan</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-2xl font-bold text-[var(--text-main)] text-center">Posture Scan</h2>
+        <p className="text-[var(--text-muted)] text-center">
           Stand centered in the frame. We will capture your alignment to build your custom plan.
         </p>
       </div>
 
       <div className="flex-1 space-y-6">
         <Card
-          className="relative flex min-h-[400px] flex-col items-center justify-center border-2 overflow-hidden bg-black rounded-2xl shadow-2xl"
+          className="relative flex min-h-[400px] flex-col items-center justify-center border-2 overflow-hidden bg-black rounded-2xl shadow-xl"
           style={{
             borderStyle: photoCaptured ? "solid" : "dashed",
             borderColor: photoCaptured ? "#4682B4" : "#cbd5e1",
@@ -160,12 +160,12 @@ export function BodyPhotoPage() {
 
         {photoCaptured ? (
           <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" onClick={handleRetake} className="h-12 rounded-xl">Retake Scan</Button>
-            <Button onClick={() => navigate("/onboarding/goal-selection")} className="h-12 rounded-xl shadow-lg shadow-blue-200">Continue</Button>
+            <Button variant="outline" onClick={handleRetake} className="h-12 rounded-xl border-black-200 hover:bg-[var(--primary-light)]">Retake Scan</Button>
+            <Button onClick={() => navigate("/onboarding/goal-selection")} className="h-12 rounded-xl bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] shadow-lg shadow-green-200">Continue</Button>
           </div>
         ) : (
           <div className="w-full">
-            <Button onClick={handleCapture} className="w-full h-12 rounded-xl bg-primary hover:bg-primary-hover shadow-lg shadow-blue-300" isLoading={isAnalyzing}>Capture Pose</Button>
+            <Button onClick={handleCapture} className="w-full h-12 rounded-xl bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] shadow-sm shadow-green-200" isLoading={isAnalyzing}>Capture Pose</Button>
           </div>
         )}
 
