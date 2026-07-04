@@ -72,7 +72,7 @@ export function OnboardingCompletePage() {
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div
           className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-3xl opacity-15"
-          style={{ background: "radial-gradient(circle, #4682B4 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, var(--primary-solid) 0%, transparent 70%)" }}
         />
       </div>
 
@@ -88,8 +88,8 @@ export function OnboardingCompletePage() {
           <div
             className="w-24 h-24 rounded-full flex items-center justify-center mx-auto"
             style={{
-              background: "linear-gradient(135deg, #4682B4 0%, #5BA3D0 100%)",
-              boxShadow: "0 8px 32px rgba(70, 130, 180, 0.3)",
+  background: "linear-gradient(135deg, var(--primary-solid) 0%, var(--primary-light) 100%)",
+  boxShadow: "0 8px 32px rgba(61, 139, 120, 0.25)", 
             }}
           >
             <motion.svg
@@ -144,7 +144,7 @@ export function OnboardingCompletePage() {
         >
           <Button
             onClick={handleStart}
-            className="h-14 px-10 text-base"
+            className="h-14 px-10 text-base rounded-full"
             rightIcon={<ArrowRight size={18} />}
           >
             Start Training
