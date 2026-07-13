@@ -36,7 +36,7 @@ export function ExercisePreviewPage() {
     <PageTransition variant="slide" className="flex flex-col min-h-screen">
       <Header title="Exercise Detail" showBack onBack={() => navigate(-1)} />
       
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-4">
         <div 
           className="h-64 w-full bg-cover bg-center"
           style={{ backgroundImage: `url(${exercise.imageUrl})` }}
@@ -58,34 +58,32 @@ export function ExercisePreviewPage() {
             <h2 className="text-3xl font-bold mt-2">{exercise.name}</h2>
           </div>
 
-          <div className="bg-muted/50 rounded-xl p-4 flex gap-3 text-sm">
+          <div className="bg-[var(--primary-solid)]/10 rounded-xl p-4 flex gap-3 text-sm">
             <Info className="h-5 w-5 text-primary flex-shrink-0" />
-            <p className="text-muted-foreground">
+            <p className="text-[var(--text-main)]/80">
               Keep your core tight and your back straight during the entire movement to prevent injury.
             </p>
           </div>
 
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Instructions</h3>
-            <ol className="list-decimal list-outside ml-4 space-y-3 text-muted-foreground">
+            <ol className="list-decimal list-outside ml-4 space-y-3 text-[var(--text-muted)] text-base">
               <li>Position your body properly before starting.</li>
               <li>Lower yourself steadily while inhaling.</li>
               <li>Push back up explosively while exhaling.</li>
               <li>Repeat for the designated number of repetitions.</li>
             </ol>
           </div>
-        </div>
-      </div>
-
-      <div className="sticky bottom-0 bg-background border-t p-4 pb-safe-area shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
-        <Button 
+          <Button 
           className="w-full" 
           size="lg"
           onClick={() => navigate(`/workout/active?id=${exercise.id}`)}
         >
           Begin Exercise
         </Button>
+        </div>
       </div>
+        
     </PageTransition>
   );
 }
