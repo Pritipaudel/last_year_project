@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Calendar, Play } from "lucide-react";
+import { Activity, Calendar, Play,Dumbbell,ArrowRight,Sparkles, ChevronDown, Trophy,User,Flame} from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -21,7 +21,12 @@ export function DashboardPage() {
   
   const [currentGoal, setCurrentGoal] = useState<string>("");
   const [isUpdatingGoal, setIsUpdatingGoal] = useState(false);
-
+  const todayDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -36,7 +41,6 @@ export function DashboardPage() {
         if (profileData && profileData.goal) {
           setCurrentGoal(profileData.goal);
         }
-        
         // Pick Squat as "Today's Plan" if available, otherwise first exercise
         const squat = exData.find(ex => ex.name.toLowerCase().includes('squat'));
         setTodayExercise(squat || exData[0] || null);
@@ -55,145 +59,414 @@ export function DashboardPage() {
   }
 
   return (
-    <PageTransition variant="fade" className="flex flex-col min-h-screen pb-20 md:pb-6">
-      <Header title="Dashboard" />
-      
-      <div className="p-4 sm:p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">
-              Hello, {user?.name?.split(' ')[0] || 'User'}! 👋
-            </h2>
-            <p className="text-muted-foreground">Ready for your workout today?</p>
-          </div>
-          
-          <div className="flex flex-col items-start sm:items-end bg-secondary/30 p-2 sm:px-3 sm:py-2 rounded-lg border border-primary/10">
-            <span className="text-[10px] uppercase font-bold text-primary tracking-wider mb-1">
-              Current Category
-            </span>
-            <select 
-              title="Fitness Goal"
-              value={currentGoal}
-              onChange={async (e) => {
-                const newGoal = e.target.value;
-                setCurrentGoal(newGoal);
-                setIsUpdatingGoal(true);
-                try {
-                  await biometricService.updateProfile({ goal: newGoal });
-                  // Reload exercises dynamically based on new goal
-                  const exData = await exerciseService.getExercises();
-                  setExercises(exData);
-                  const squat = exData.find(ex => ex.name.toLowerCase().includes('squat'));
-                  setTodayExercise(squat || exData[0] || null);
-                } catch (e) {
-                  console.error("Failed to update goal");
-                } finally {
-                  setIsUpdatingGoal(false);
-                }
-              }}
-              className="bg-transparent text-sm font-semibold border-none p-0 focus:ring-0 cursor-pointer outline-none w-auto"
-              disabled={isUpdatingGoal}
-            >
-              <option value="weight_gain" className="bg-background">Weight Gain</option>
-              <option value="weight_loss" className="bg-background">Weight Loss</option>
-              <option value="stay_active" className="bg-background">Stay Active</option>
-              <option value="flexibility" className="bg-background">Flexibility</option>
-              <option value="rehabilitation" className="bg-background">Doctor Recommended (Rehab)</option>
-            </select>
-          </div>
-        </div>
-
-        {todayExercise ? (
-          <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <Badge variant="secondary" className="mb-2">Today's Plan</Badge>
-                  <h3 className="text-xl font-bold">{todayExercise.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {todayExercise.muscleGroup} • {todayExercise.difficulty}
-                  </p>
+    <PageTransition variant="fade" className="flex flex-col min-h-screen bg-[var(--bg-dashboard)] pb-12"> 
+    <Header title="Dashboard" />
+    {/* first row */}
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
+      <Card className="rounded-2xl p-6 md:col-span-2 justify-between relative overflow-hidden" style={{
+                background: "linear-gradient(135deg, #3d8b78 0%, #72b8a9 100%)",}}>
+              <div className="absolute -top-6 -right-6 rounded-full opacity-20" style={{ width: 120, height: 120, background: "#fff" }} />
+              <div className="absolute -bottom-8 -left-4 rounded-full opacity-10" style={{ width: 100, height: 100, background: "#fff" }} />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles size={18} color="rgba(255,255,255,0.85)" />
+                  <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.7)" }}>
+                    Welcome back
+                  </span>
                 </div>
-                <div className="hidden sm:flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 text-primary">
-                  <Activity className="h-8 w-8" />
-                </div>
+                <h2 className="text-2xl font-extrabold mt-1" style={{ color: "#fff" }}>Hello, Test! </h2>
+                <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.8)" }}>Ready for your workout today?</p>
               </div>
-              <Button 
-                className="w-full sm:w-auto" 
-                leftIcon={<Play className="h-4 w-4" />}
-                onClick={() => navigate(`/exercises/${todayExercise.id}`)}
+              <Button
+              size="sm"
+              onClick={()=>navigate(`/exercises/${todayExercise?.id}`)}
+                className="relative z-10 self-start mt-4 flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-semibold transition-all hover:opacity-80"
+                style={{ background: "rgba(255,255,255,0.2)", color: "#fff", backdropFilter: "blur(8px)" }}
               >
-                Start Workout
+                <span>Start workout</span> 
+                <ArrowRight size={14} />
               </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="p-8 text-center text-muted-foreground">
-            Complete your profile to see personalized workouts!
-          </Card>
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Workouts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{recentSessions.length}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Streak</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center space-x-2">
-              <div className="text-2xl font-bold text-emerald-600">
-                {recentSessions.length > 0 ? '1' : '0'}
-              </div>
-              <span className="text-sm text-muted-foreground">days</span>
-            </CardContent>
-          </Card>
+      </Card>
+      
+      <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6 flex flex-col justify-center items-center text-center">
+        <div className="w-10 h-10 rounded-xl bg-[var(--coral-surface)] flex items-center justify-center text-[var(--coral-text)]">
+          <Calendar size={20} />
         </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Recent Activity</h3>
-            <Link to="/history" className="text-sm text-primary font-medium hover:underline">View all</Link>
-          </div>
-          
-          <div className="space-y-3">
-            {recentSessions.length > 0 ? (
-              recentSessions.map((session) => (
-                <Card key={session.id} variant="default" className="py-2">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{session.exercise_name || session.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(session.created_at).toLocaleDateString()} • {session.duration_minutes} mins
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-sm font-medium text-primary text-right">
-                      {session.metadata?.pose_type === 'static_hold' 
-                        ? `${Math.max(session.metadata.left_leg_hold_seconds || 0, session.metadata.right_leg_hold_seconds || 0)}s hold`
-                        : `${session.reps || 0} reps`}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed text-sm">
-                No recent workouts found. Start your first session today!
-              </div>
-            )}
-          </div>
+        <div className="mt-4">
+          <span className="text-[11px] font-bold uppercase text-[var(--text-muted)] tracking-wider">
+            Today
+          </span>
+          <h3 className="text-2xl font-black text-[var(--text-main)] mt-0.5">
+            {todayDate.split(',')[0]}
+          </h3>
+          <p className="text-xs font-semibold text-[var(--text-muted)] mt-0.5">
+            {todayDate.substring(todayDate.indexOf(',')+1).trim()}
+          </p>
         </div>
+      </Card>
+      <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6 flex flex-col justify-center text-center">
+        <span className="text-[12px] font-bold uppercase text-[var(--text-muted)] mt-0.5 ">Current Category</span>
+        <div className="relative w-full bg-[var(--bg-canvas)] border border-[var(--border-card)] mt-2 rounded-xl px-4 py-2.5 flex items-center justify-between group hover:border-[var(--primary-light)] transition-colors ">
+          <select title="Fitness Goal" value={currentGoal} onChange={async (e) => {const newGoal = e.target.value;
+                    setCurrentGoal(newGoal);
+                    setIsUpdatingGoal(true);
+                    try {
+                      await biometricService.updateProfile({ goal: newGoal });
+                      const { data } = await exerciseService.getExercises();
+                      setExercises(data || []);
+                    } catch (e) {
+                      console.error("Failed to update goal");
+                    } finally {
+                      setIsUpdatingGoal(false);
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                  disabled={isUpdatingGoal}>
+            <option value="weight_gain">Weight Gain</option>
+            <option value="weight_loss">Weight Loss</option>
+            <option value="stay_active">Stay Active</option>
+            <option value="flexibility">Flexibility</option>
+            <option value="rehabilitation">Doctor Recommendation(Rehab)</option>
+          </select>
+          <span className="text-sm font-bold text-[var(--primary-hover)] capitalize">
+                  {currentGoal.replace('_', ' ')}
+                </span>
+                <ChevronDown size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition-colors" />      
+        </div>
+      </Card>
+    </div>
+    {/* second row */}
+     <div className="text-center grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+        <Card className="bg-[var(--accent-surface)] p-6">
+          <div>
+            <div className="w-full h-16 flex items-center justify-center">
+            {recentSessions.length>0?<Trophy size={48} style={{
+              stroke: "var(--primary-light)"
+            }}
+            />:<Trophy size={48} color="#837c7c" fill="#000000"
+            />}
+          </div>
+            <span className="uppercase text-[10px] font-bold tracking-widest text-[var(--text-muted)]">Total</span>
+          </div>
+          <div className="">
+            <span className="text-4xl font-extrabold text-[var(--text-main)]">
+              {recentSessions.length}
+            </span>
+          </div>
+          <p className="text-xs font-semibold text-[var(--text-muted)]">Workouts Completed</p>
+          <div className="grid grid-cols-7 gap-2 mt-4 pt-2">
+              {[...Array(7)].map((_, i) => (
+                <div key={i} className="h-1 rounded-full bg-[var(--primary-solid)]/40 w-full" />
+              ))}
+          </div>
+        </Card>
+        <Card className="bg-[var(--accent-surface)] border-transparent p-6 flex flex-col justify-between">
+          <div className="w-full h-16 flex items-center justify-center text-[var(--coral-text)]">
+            {recentSessions.length>0?<Flame size={48} color="#ea580c" fill="#f97316"
+    />:<Flame size={48} color="#837c7c" fill="#000000"
+    />}
+          </div>
+          <div className="w-full text-center mt-2">
+            <div>
+              <span className="text-4xl font-extrabold text-[var(--text-main)]">
+                {recentSessions.length>0?'1':'0'}
+              </span>
+            </div>
+            <p className="text-xs font-bold text-[var(--text-main)]">
+              {recentSessions.length>0||1?'Days Streak':'Day Streak'}
+            </p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Start a session to {recentSessions.length>0?'continue':'begin'} your streak!
+            </p>
+          </div>
+        </Card>
+        <Card className="bg-[var(--primary-light)]/10 backdrop-blur-md border border-[var(--primary-hover)]/20 rounded-2xl shadow-xl p-6 text-white rounded-2xl p-6 flex flex-col justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-[var(--primary-solid)]/20 flex items-center justify-center text-[var(--coral-text)] shrink-0 shadow-sm">
+              <User size={20}/>
+            </div>
+            <div>
+              <h4 className="font-extrabold text-[var(--text-main)] text-base">Complete your profile</h4>
+              <p className="text-xs text-[var(--text-muted)] font-medium mt-0.5">Unlock personalized workouts</p>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={()=> navigate('/profile')}  className="w-full text-xs font-bold px-4 py-2 rounded-xl transition-all">
+              Setup Your Profile
+            </Button>
+          </div>
+        </Card>
+    </div>
+    
+    {/* Recent Activity */}
+    <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6 m-4">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-extrabold text-[var(--text-main)] tracking-tight">
+          <span>Recent Activity</span>
+        </h3>
+        <Link to="/history" className="text-xs font-bold bg-[var(--bg-canvas)] border border-[var(--border-card)] hover:bg-[var(--primary-light)] text-[var(--text-main)] px-3 py-1.5 rounded-lg transition-colors shadow-sm">View All</Link>
       </div>
+      <div className="space-y-3">
+        {recentSessions.length>0?(
+          recentSessions.map((session)=>(
+            <Card key={session.id} variant="default" className="py-2 mb-4">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <Calendar className="h-5 w-5 text-[var(--text-muted)]"/>
+                  </div>
+                  <div>
+                    <p className="font-medium">
+                      {session.exercise_name || session.title}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {new Date(session.created_at).toLocaleDateString()} • {session.duration_minutes} mins
+                    </p>
+                  </div>
+                </div>
+                <div className="text-sm font-medium text-[var(--primary-light)] text-right">
+                  {session.metadata?.pose_type === 'static_hold'?`${Math.max(session.metadata.left_leg_hold_seconds || 0, session.metadata.right_leg_hold_seconds || 0)}s hold` : `${session.reps || 0} reps`}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ):(
+          <div className="text-center py-12 flex flex-col items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-[var(--accent-surface)] flex items-center justify-center text-[var(--primary-hover)] mb-4">
+              <Dumbbell size={24}/>
+            </div>
+            <h4 className="font-bold text-[var(--text-main)] text-base">No recent workouts</h4>
+            <p className="text-xs text-[var(--text-muted)] max-w-sm mt-1 mb-6 font-medium leading-relaxed">Start your first session today and keep track of your progress here.</p>
+            <Button
+            onClick={() => todayExercise && navigate(`/exercises/${todayExercise.id}`)} className="bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold h-11 px-6 rounded-full transition-all flex items-center gap-2">
+              <span>Start your workout</span>
+              <ArrowRight size={24}/>
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
     </PageTransition>
+    // <PageTransition variant="fade" className="flex flex-col min-h-screen bg-[var(--bg-canvas)] pb-12">
+    //   <Header title="Dashboard" />      
+    //   <div className="p-4 sm:p-8 space-y-6 max-w-[1600px]  w-full">
+    //       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    //             <div 
+    //   className="col-span-1 min-[768px]:max-[1096px]:col-span-2 md:col-span-2 rounded-2xl p-6 text-white relative overflow-hidden flex flex-col justify-between min-h-[180px]"
+    //   style={{
+    //     background: "linear-gradient(135deg, var(--primary-solid) 0%, var(--primary-light) 100%)",
+    //   }}
+    // >
+    //         {/* Background design circle accent */}
+    //         <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-white/10 pointer-events-none" />            
+    //         <div>
+    //           <span className="text-[11px] font-bold tracking-widest uppercase opacity-80 flex items-center gap-1.5 mb-2">
+    //             <Sparkles size={12} /> Welcome Back
+    //           </span>
+    //           <h2 className="text-2xl font-extrabold tracking-tight">
+    //             Hello, {user?.name?.split(' ')[0] || 'Test'}! 👋
+    //           </h2>
+    //           <p className="text-sm opacity-90 mt-1">Ready for your workout today?</p>
+    //         </div>
+
+    //         {todayExercise && (
+    //           <div className="mt-4">
+                // <Button 
+                //   size="sm"
+                //   className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20 rounded-full font-bold px-5 text-xs transition-all flex items-center gap-2 group"
+                //   onClick={() => navigate(`/exercises/${todayExercise.id}`)}
+                // >
+    //               <span>Start workout</span>
+    //               <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+    //             </Button>
+    //           </div>
+    //         )}
+    //       </div>
+
+    //       <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6 flex flex-col justify-between">
+    //         <div className="w-10 h-10 rounded-xl bg-[var(--coral-surface)] flex items-center justify-center text-[var(--coral-text)]">
+    //           <Calendar size={20} />
+    //         </div>
+    //         <div className="mt-4">
+    //           <span className="text-[11px] font-bold uppercase text-[var(--text-muted)] tracking-wider">Today</span>
+    //           <h3 className="text-2xl font-black text-[var(--text-main)] mt-0.5">
+    //             {todayDate.split(',')[0]}
+    //           </h3>
+    //           <p className="text-xs font-semibold text-[var(--text-muted)] mt-0.5">
+    //             {todayDate.substring(todayDate.indexOf(',') + 1).trim()}
+    //           </p>
+    //         </div>
+    //       </Card>
+
+    //       <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6 flex flex-col justify-between">
+    //         <div>
+    //           <span className="text-[11px] font-bold uppercase text-[var(--text-muted)] tracking-wider block mb-2">
+    //             Current Category
+    //           </span>
+              
+    //           <div className="relative w-full bg-[var(--bg-canvas)] border border-[var(--border-card)] rounded-xl px-4 py-2.5 flex items-center justify-between group hover:border-[var(--primary-light)] transition-colors">
+    //             <select 
+                  // title="Fitness Goal"
+                  // value={currentGoal}
+                  // onChange={async (e) => {
+                  //   const newGoal = e.target.value;
+                  //   setCurrentGoal(newGoal);
+                  //   setIsUpdatingGoal(true);
+                  //   try {
+                  //     await biometricService.updateProfile({ goal: newGoal });
+                  //     const { data } = await exerciseService.getExercises();
+                  //     setExercises(data || []);
+                  //   } catch (e) {
+                  //     console.error("Failed to update goal");
+                  //   } finally {
+                  //     setIsUpdatingGoal(false);
+                  //   }
+                  // }}
+                  // className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                  // disabled={isUpdatingGoal}
+    //             >
+    //               <option value="weight_gain">Weight Gain</option>
+    //               <option value="weight_loss">Weight Loss</option>
+    //               <option value="stay_active">Stay Active</option>
+    //               <option value="flexibility">Flexibility</option>
+    //               <option value="rehabilitation">Doctor Recommended (Rehab)</option>
+                // </select>
+                // <span className="text-sm font-bold text-[var(--primary-hover)] capitalize">
+                //   {currentGoal.replace('_', ' ')}
+                // </span>
+                // <ChevronDown size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition-colors" />
+    //           </div>
+    //         </div>
+
+    //         <div className="mt-4">
+    //           <span className="inline-block text-[11px] font-bold text-[var(--coral-text)] bg-[var(--coral-surface)] px-3 py-1 rounded-full capitalize">
+    //             {currentGoal.replace('_', ' ')} · This week
+    //           </span>
+    //         </div>
+    //       </Card>
+    //   </div>        
+    //    </div>
+    //    <div className="p-4 sm:p-8 space-y-6 max-w-[1600px] mx-auto w-full">        
+    //     <div className="grid grid-cols-1 min-[768px]:max-[1096px]:col-span-2 md:grid-cols-4 gap-6">
+          
+    //       {/* WORKOUTS COMPLETED GRAPH OVERVIEW */}
+    //       <Card className="sm: col-span-1 md:col-span-2 bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6">
+    //         <div className="flex items-center justify-between mb-6">
+    //           <div className="w-10 h-10 rounded-full bg-[var(--accent-surface)] flex items-center justify-center text-[var(--accent-text)]">
+    //             <Trophy size={20} />
+    //           </div>
+    //           <span className="text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">Total</span>
+    //         </div>
+    //         <div className="flex items-baseline gap-1">
+    //           <span className="text-5xl font-black text-[var(--text-main)]">{recentSessions.length}</span>
+    //         </div>
+    //         <p className="text-xs font-semibold text-[var(--text-muted)] mt-1">Workouts completed</p>
+            
+    //         {/* Horizontal timeline chart dash lines wrapper bar matching layout pattern */}
+            // <div className="grid grid-cols-7 gap-2 mt-6 pt-2">
+            //   {[...Array(7)].map((_, i) => (
+            //     <div key={i} className="h-1 rounded-full bg-[var(--border-card)]/60 w-full" />
+            //   ))}
+    //         </div>
+    //       </Card>
+    //       <Card className="bg-[var(--accent-surface)] border-transparent rounded-2xl p-6 flex flex-col justify-between">
+    //           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[var(--accent-text)] shadow-sm">
+    //             <Flame size={20} />
+    //           </div>
+    //           <div className="mt-4">
+    //             <div className="flex items-baseline gap-1">
+    //               <span className="text-4xl font-black text-[var(--text-main)]">{recentSessions.length > 0 ? '1' : '0'}</span>
+    //             </div>
+    //             <p className="text-xs font-bold text-[var(--text-main)]">Day streak</p>
+    //             <p className="text-[11px] text-[var(--text-muted)] mt-1 font-medium">
+    //               Start a session to begin your streak!
+    //             </p>
+    //           </div>
+    //         </Card>
+    //       {/* DYNAMIC METRIC ACCENT WIDGET (STREAK OR PROFILE NOTICE) */}
+    //         <Card className="bg-[var(--coral-surface)] border-transparent rounded-2xl p-6 flex flex-col justify-between">
+    //           <div className="flex items-center gap-4">
+    //             <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-[var(--coral-text)] shrink-0 shadow-sm">
+    //               <User size={20} />
+    //             </div>
+    //             <div>
+    //               <h4 className="font-extrabold text-[var(--text-main)] text-base">Complete your profile</h4>
+    //               <p className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
+    //                 Unlock personalized workouts
+    //               </p>
+    //             </div>
+    //           </div>
+    //           <div className="mt-6 flex justify-end">
+    //             <Button 
+    //               size="sm"
+    //               onClick={() => navigate('/profile')}
+    //               className="bg-[var(--primary-hover)] hover:bg-[var(--primary-solid)] text-white text-xs font-bold px-4 py-2 rounded-xl transition-all"
+    //             >
+    //               Setup
+    //             </Button>
+    //           </div>
+    //         </Card>            
+    //     </div>             
+
+    //     <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6">
+    //       <div className="flex items-center justify-between mb-6">
+    //         <h3 className="text-lg font-extrabold text-[var(--text-main)] tracking-tight flex items-center gap-2">
+    //           <span className="w-1.5 h-4 bg-[var(--primary-solid)] rounded-full inline-block" />
+    //           Recent Activity
+    //         </h3>
+    //         <Link 
+    //           to="/history" 
+    //           className="text-xs font-bold bg-[var(--bg-canvas)] border border-[var(--border-card)] hover:border-[var(--primary-light)] text-[var(--text-main)] px-3 py-1.5 rounded-lg transition-colors"
+    //         >
+    //           View all
+    //         </Link>
+    //       </div>
+          
+    //       <div className="space-y-3">
+    //         {recentSessions.length > 0 ? (
+              // recentSessions.map((session) => (
+              //   <Card key={session.id} variant="default" className="py-2">
+              //     <CardContent className="p-4 flex items-center justify-between">
+              //       <div className="flex items-center space-x-4">
+              //         <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+              //           <Calendar className="h-5 w-5 text-muted-foreground" />
+              //         </div>
+              //         <div>
+              //           <p className="font-medium">{session.exercise_name || session.title}</p>
+              //           <p className="text-xs text-muted-foreground">
+              //             {new Date(session.created_at).toLocaleDateString()} • {session.duration_minutes} mins
+              //           </p>
+              //         </div>
+              //       </div>
+              //       <div className="text-sm font-medium text-primary text-right">
+              //         {session.metadata?.pose_type === 'static_hold' 
+              //           ? `${Math.max(session.metadata.left_leg_hold_seconds || 0, session.metadata.right_leg_hold_seconds || 0)}s hold`
+              //           : `${session.reps || 0} reps`}
+              //       </div>
+              //     </CardContent>
+              //   </Card>
+              // ))
+    //         ) : (
+    //           <div className="text-center py-12 flex flex-col items-center justify-center">
+    //             <div className="w-14 h-14 rounded-full bg-[var(--bg-canvas)] flex items-center justify-center text-[var(--primary-hover)] mb-4">
+    //               <Dumbbell size={24} />
+    //             </div>
+    //             <h4 className="font-bold text-[var(--text-main)] text-base">No recent workouts found</h4>
+    //             <p className="text-xs text-[var(--text-muted)] max-w-sm mt-1 mb-6 font-medium leading-relaxed">
+    //               Start your first session today and track your progress here.
+    //             </p>
+    //             <Button
+    //               onClick={() => todayExercise && navigate(`/exercises/${todayExercise.id}`)}
+    //               className="bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold h-11 px-6 rounded-full transition-all flex items-center gap-2"
+    //             >
+    //               <span>Start your first workout</span>
+    //               <ArrowRight size={14} />
+    //             </Button>
+    //           </div>
+    //         )}
+    //       </div>
+    //     </Card>
+    //     </div>
+    // </PageTransition>
   );
 }
