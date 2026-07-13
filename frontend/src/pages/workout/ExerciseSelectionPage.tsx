@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter,Star,ChevronRight } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -15,6 +15,8 @@ export function ExerciseSelectionPage() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState<string>("All");
+  const muscleGroups =  ["All", "Chest", "Back", "Legs", "Core", "Arms"];
 
   useEffect(() => {
     const fetchExercises = async () => {
@@ -54,15 +56,19 @@ export function ExerciseSelectionPage() {
         </div>
 
         <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
-          {["All", "Chest", "Back", "Legs", "Core", "Arms"].map((group) => (
-            <Badge 
+          {muscleGroups.map((group)=>{
+            const isSelected = selectedGroup === group;
+            return(
+              <Badge 
               key={group} 
-              variant={group === "All" ? "default" : "outline"}
-              className="cursor-pointer whitespace-nowrap px-4 py-1.5"
+              variant={isSelected ? "default" : "outline"}
+              onClick={()=> setSelectedGroup(group)}
+              className="cursor-pointer whitespace-nowrap px-4 py-2 text-sm"
             >
               {group}
             </Badge>
-          ))}
+            )
+          })}
         </div>
 
         {isLoading ? (
@@ -70,30 +76,38 @@ export function ExerciseSelectionPage() {
             <LoadingSpinner />
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {filteredExercises.map((exercise) => (
-              <Card 
-                key={exercise.id} 
-                variant="interactive"
-                onClick={() => navigate(`/exercises/${exercise.id}`)}
-                className="overflow-hidden"
-              >
-                <div 
-                  className="h-32 w-full bg-cover bg-center"
-                  style={{ backgroundImage: `url(${exercise.imageUrl})` }}
-                />
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold">{exercise.name}</h3>
-                    <Badge variant="secondary" className="text-[10px]">{exercise.difficulty}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{exercise.muscleGroup}</p>
-                </CardContent>
-              </Card>
+              <Card key={exercise.id} variant="interactive" onClick={() => navigate(`/exercises/${exercise.id}`)} className="overflow-hidden rounded-3xl border border-slate-100 shadow-sm bg-white cursor-pointer">
+                <div className="relative w-full h-52">
+                  <img src={exercise.imageUrl} 
+                  alt={exercise.name} className="w-full h-full object-cover"/>
+                  <span className="absolute top-3 right-3 text-xs font-semibold px-3 py-1.5 rounded-full bg-teal-50 text-teal-700">{exercise.difficulty || "Beginner"}</span>
+            </div>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-slate-900 tracking-tight">
+                  {exercise.name}
+                </h3>
+                <Star className="w-5 h-5 text-slate-400 hover:text-yellow-400 transition-colors" />
+              </div>
+              <div className="flex justify-between items-center text-sm font-medium">
+                <div className="flex items-center space-x-3 text-slate-500">
+                  <span className="text-sm text-[var(--text-muted)]">
+                    {exercise.muscleGroup || "Arms"}
+                  </span>
+              </div>
+              <button className="flex items-center space-x-1 bg-teal-50 text-teal-700 px-4 py-2 rounded-full font-semibold hover:bg-teal-100 transition-colors">
+                <span>Start</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+  </CardContent>
+</Card>
             ))}
             
             {filteredExercises.length === 0 && (
-              <div className="col-span-full py-12 text-center text-muted-foreground">
+              <div className="col-span-full py-12 text-center text-[var(--text-muted)]">
                 No exercises found matching your search.
               </div>
             )}
