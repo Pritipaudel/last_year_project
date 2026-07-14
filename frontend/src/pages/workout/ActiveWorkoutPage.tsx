@@ -495,17 +495,17 @@ export function ActiveWorkoutPage() {
             {isCurl ? (
               <>
                 <div className="flex flex-col items-center">
-                  <span className="text-[7px] uppercase font-black text-blue-400">L ARM</span>
+                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)]">L ARM</span>
                   <span className="text-lg font-black">{repsLeft}</span>
                 </div>
                 <div className="w-[1px] h-4 bg-white/10" />
                 <div className="flex flex-col items-center">
-                  <span className="text-[7px] uppercase font-black text-primary">REPS</span>
+                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)]">REPS</span>
                   <span className="text-xl font-black">{reps}</span>
                 </div>
                 <div className="w-[1px] h-4 bg-white/10" />
                 <div className="flex flex-col items-center">
-                  <span className="text-[7px] uppercase font-black text-blue-400">R ARM</span>
+                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)]">R ARM</span>
                   <span className="text-lg font-black">{repsRight}</span>
                 </div>
               </>
@@ -545,15 +545,15 @@ export function ActiveWorkoutPage() {
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none" playsInline />
         {!isCameraActive ? (
           <div className="text-center p-8 space-y-12">
-            <div className="h-28 w-28 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary relative">
-              <div className="absolute inset-0 rounded-full animate-ping bg-primary/10 opacity-30" />
-              {isCurl ? <Dumbbell size={40} className="relative z-10" /> : <CameraIcon size={40} className="relative z-10" />}
+            <div className="h-28 w-28 bg-[var(--primary-solid)]/20 rounded-full flex items-center justify-center mx-auto text-primary relative">
+              <div className="absolute inset-0 rounded-full animate-ping bg-[var(--primary-solid)]/100 opacity-30" />
+              {isCurl ? <Dumbbell size={40} className="relative z-10" stroke="var(--primary-light)" /> : <CameraIcon size={40} stroke="var(--primary-light)" className="relative z-10" />}
             </div>
             <div className="space-y-4">
-              <h3 className="text-4xl font-black tracking-tighter uppercase italic text-white">{exercise?.name}</h3>
-              <p className="text-neutral-500 text-sm font-medium">Stand back so I can see your full body</p>
+              <h3 className="text-3xl font-black tracking-tighter uppercase italic text-white">{exercise?.name}</h3>
+              <p className="text-[var(--text-muted)] text-sm font-medium">Stand back so I can see your full body</p>
             </div>
-            <Button onClick={() => setIsCameraActive(true)} size="lg" className="rounded-full px-16 h-20 text-xl font-black bg-primary">
+            <Button onClick={() => setIsCameraActive(true)} size="lg" className="rounded-full px-16 h-20 text-xl font-black bg-[var(--primary-solid)]">
               Start Live Session
             </Button>
           </div>

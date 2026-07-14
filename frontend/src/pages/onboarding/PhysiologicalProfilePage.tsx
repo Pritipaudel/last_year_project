@@ -94,24 +94,25 @@ export function PhysiologicalProfilePage() {
   const bmi = calculateBMI();
 
   return (
-    <PageTransition variant="fade" className="flex flex-col min-h-screen bg-surface-base">
+    <PageTransition variant="fade" className="flex flex-col max-h-screen bg-[var(--bg-dashboard)]">
       <div className="px-4 py-8 max-w-md mx-auto w-full flex-1 flex flex-col">
         {/* Header & Progress */}
         <div className="mb-8">
           <button 
-            onClick={() => (step > 1 ? setStep(step - 1) : navigate(-1))} 
-            className="flex items-center gap-2 mb-6 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft size={20} strokeWidth={2} />
-          </button>
+          onClick={() => (step > 1 ? setStep(step - 1) : navigate(-1))} 
+          className="flex items-center gap-2 text-sm font-semibold text-[var(--accent-text)] hover:text-[var(--primary-hover)] transition-colors w-fit mb-6"
+        >
+          <ArrowLeft size={16} strokeWidth={2.5} />
+          <span>Back</span>
+        </button>
 
-          <p className="text-sm mb-3 font-medium text-muted-foreground">
+          <p className="text-sm mb-3 text-center font-medium text-[var(--text-muted)]">
             Step {step} of 3
           </p>
           <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
             <div 
               className="h-full transition-all duration-300 ease-out rounded-full"
-              style={{ width: `${(step / 3) * 100}%`, background: '#4682B4' }}
+              style={{ width: `${(step / 3) * 100}%`, background: 'var(--primary-solid)' }}
             />
           </div>
         </div>
@@ -121,14 +122,14 @@ export function PhysiologicalProfilePage() {
           {/* Step 1: Age Group */}
           {step === 1 && (
             <PageTransition variant="slide" key="step1">
-              <h1 className="text-2xl font-bold mb-2 text-foreground">
+              <h1 className="text-2xl font-bold mb-2 text-foreground text-center">
                 What's your age group?
               </h1>
-              <p className="mb-8 text-muted-foreground">
+              <p className="mb-8 text-[var(--text-muted)] text-sm text-center">
                 This helps us tailor exercises to your biomechanical needs
               </p>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 {ageGroups.map((group) => {
                   const Icon = group.icon;
                   const isSelected = formData.ageGroup === group.value;
@@ -138,11 +139,11 @@ export function PhysiologicalProfilePage() {
                       onClick={() => setFormData({ ...formData, ageGroup: group.value })}
                       className="h-32 rounded-xl flex flex-col items-center justify-center gap-3 transition-all border-2"
                       style={{
-                        borderColor: isSelected ? '#4682B4' : '#E2E8F0',
-                        background: isSelected ? 'rgba(70, 130, 180, 0.08)' : '#FFFFFF',
-                        color: isSelected ? '#4682B4' : '#1E293B',
-                        transform: isSelected ? 'scale(0.97)' : 'scale(1)',
-                      }}
+                      borderColor: isSelected ? 'var(--accent-text)' : 'var(--text-muted)',
+                      background: isSelected ? 'var(--accent-surface)' : 'var(--bg-card)',
+                      boxShadow: isSelected ? 'none' : '0 1px 3px rgba(0,0,0,0.02)',
+                      transform: isSelected ? 'scale(0.98)' : 'scale(1)',
+                    }}
                     >
                       <Icon size={32} strokeWidth={2} />
                       <span className="font-semibold">{group.label}</span>
@@ -259,7 +260,7 @@ export function PhysiologicalProfilePage() {
             onClick={handleContinue}
             disabled={!isStepComplete() || isSaving}
             isLoading={isSaving}
-            className="w-full h-14 text-lg"
+            className="w-full h-14 text-lg bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)]"
           >
             {step === 3 ? 'Continue to Camera Setup' : 'Continue'}
           </Button>

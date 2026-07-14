@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, User, Ruler, Target, Camera } from "lucide-react";
+import { CheckCircle2, User, Ruler, Target, Camera,ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { PageTransition } from "@/components/common/PageTransition";
@@ -53,7 +53,7 @@ export function GoalsConfirmationPage() {
 
   return (
     <PageTransition variant="slide" className="flex flex-col h-full">
-      <div className="mb-6">
+      <div className="mb-6 text-center">
         <h2 className="text-2xl font-bold text-foreground mb-2">Confirm Your Profile</h2>
         <p className="text-muted-foreground">
           Review your selections before we create your personalized plan.
@@ -72,17 +72,17 @@ export function GoalsConfirmationPage() {
               transition={{ duration: 0.3, delay: index * 0.08 }}
               className="flex items-center gap-4 p-4 rounded-xl border"
               style={{
-                background: "#FFFFFF",
-                borderColor: isSet ? "#B8D8F8" : "#E2E8F0",
+                background: 'var(--bg-card)',
+                borderColor: isSet ? 'var(--primary-light)' : 'var(--border-card)',
               }}
             >
               <div
                 className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
                 style={{
-                  background: isSet ? "#EBF4FF" : "#F1F5F9",
+                  background: isSet ? 'var(--accent-surface)' : 'var(--border-card)',
                 }}
               >
-                <Icon size={20} style={{ color: isSet ? "#4682B4" : "#94A3B8" }} />
+                <Icon size={20} style={{ color: isSet ? "var(--accent-text)" : "var(--text-muted)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -102,11 +102,13 @@ export function GoalsConfirmationPage() {
 
       <div className="pt-8 flex justify-between">
         <Button variant="ghost" onClick={() => navigate(-1)}>
-          Back
+          <ArrowLeft size={16} strokeWidth={2.5}></ArrowLeft>
+          <span className="px-2">Back</span>
         </Button>
         <Button
           onClick={() => navigate("/onboarding/complete")}
           disabled={!selectedGoal}
+          className="h-12 px-6 rounded-full bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] text-white font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
         >
           Start My Plan
         </Button>
