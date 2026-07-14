@@ -28,10 +28,10 @@ import { ProfilePage } from "@/pages/profile/ProfilePage";
 export const router = createBrowserRouter([
   {
     path: ROUTES.HOME,
-    element: <SplashScreen />,
+    element: <Navigate to={ROUTES.WELCOME} replace />,
   },
   
-  // Public Entry (Landing Page features Auth)
+  // Public Entry (Login / Signup)
   {
     element: <PublicRoute />,
     children: [

@@ -60,11 +60,8 @@ export function WelcomePage() {
         setAuth(response.user, response.access);
         addToast({ title: "Welcome back!", description: "Successfully logged in.", type: "success" });
         
-        if (response.user.onboardingComplete) {
-          navigate('/dashboard');
-        } else {
-          navigate('/onboarding/physiological-profile');
-        }
+        // Go to dashboard by default as per user request
+        navigate('/dashboard');
       } else {
         await authService.register({
           username: data.email,

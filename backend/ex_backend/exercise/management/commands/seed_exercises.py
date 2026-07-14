@@ -381,7 +381,7 @@ EXERCISES = [
             "18-25": {
                 # Source: Magnusson et al. (1996) — 30s minimum for proprioceptive adaptation;
                 # Yoga Alliance 200hr — 30-60s target hold for flexibility-oriented practice.
-                "target_hold_seconds": 30,
+                "target_hold_seconds": 45,
                 "foot_placement": "inner_thigh",
                 "foot_placement_landmark": "hip",
                 "standing_position": "free_standing",
@@ -391,7 +391,7 @@ EXERCISES = [
             },
             "26-40": {
                 # Source: ACE Yoga Science Guide (2020) — lower bound of 20-45s range.
-                "target_hold_seconds": 20,
+                "target_hold_seconds": 45,
                 "foot_placement": "inner_knee",
                 "foot_placement_landmark": "knee",
                 "standing_position": "free_standing",

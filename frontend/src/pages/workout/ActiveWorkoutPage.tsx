@@ -108,11 +108,16 @@ export function ActiveWorkoutPage() {
   const secondsRef = useRef(0);
   const trackingStatusRef = useRef(trackingStatus);
 
+  const treeHoldLeftRef = useRef(0);
+  const treeHoldRightRef = useRef(0);
+
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { exerciseRef.current = exercise; }, [exercise]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
   useEffect(() => { trackingStatusRef.current = trackingStatus; }, [trackingStatus]);
+  useEffect(() => { treeHoldLeftRef.current = treeHoldLeft; }, [treeHoldLeft]);
+  useEffect(() => { treeHoldRightRef.current = treeHoldRight; }, [treeHoldRight]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -211,19 +216,42 @@ export function ActiveWorkoutPage() {
       if (isPausedRef.current) return;
 
       if (isStatic && treeTrackerRef.current) {
+        // The tracker itself handles all phase detection, visibility checking,
+        // and voice feedback. We just feed it landmarks and update UI.
         const now = Date.now();
         const result = treeTrackerRef.current.processFrame(landmarks, now);
-        
+
+        // Update tracking status for the header HUD
+        if (result.phase === 'invisible') {
+          if (trackingStatusRef.current !== 'lost') {
+            setTrackingStatus('lost');
+            trackingStatusRef.current = 'lost';
+          }
+          consecutiveLostFrames.current++;
+        } else {
+          if (trackingStatusRef.current !== 'tracking') {
+            setTrackingStatus('tracking');
+            trackingStatusRef.current = 'tracking';
+          }
+          consecutiveLostFrames.current = 0;
+        }
+
         if (result.isComplete && !isPausedRef.current) {
-           handleFinish();
-           return;
+          handleFinish();
+          return;
         }
 
         if (now - lastUiUpdateAt.current > 100) {
           setTreeHoldLeft(result.leftLeg.holdSeconds);
           setTreeHoldRight(result.rightLeg.holdSeconds);
           setTreeActiveLeg(result.activeLeg);
-          setTreeIsHolding(result.activeLeg === 'left' ? result.leftLeg.isHolding : result.rightLeg.isHolding);
+          setTreeIsHolding(
+            result.activeLeg === 'left'
+              ? result.leftLeg.isHolding
+              : result.activeLeg === 'right'
+              ? result.rightLeg.isHolding
+              : false,
+          );
           lastUiUpdateAt.current = now;
         }
         return;
@@ -383,8 +411,8 @@ export function ActiveWorkoutPage() {
       if (isStatic) {
         await exerciseService.submitHoldSessionSummary({
           exercise_id: exercise.id,
-          left_leg_hold_duration_seconds: treeHoldLeft,
-          right_leg_hold_duration_seconds: treeHoldRight,
+          left_leg_hold_duration_seconds: treeHoldLeftRef.current,
+          right_leg_hold_duration_seconds: treeHoldRightRef.current,
           target_hold_duration_seconds: treeTarget,
           form_errors_triggered: sessionErrors.current as any,
         });
@@ -392,9 +420,9 @@ export function ActiveWorkoutPage() {
           state: {
             exerciseName: exercise.name,
             isStaticHold: true,
-            treeHoldLeft: Math.floor(treeHoldLeft),
-            treeHoldRight: Math.floor(treeHoldRight),
-            duration: formatTime(seconds),
+            treeHoldLeft: Math.floor(treeHoldLeftRef.current),
+            treeHoldRight: Math.floor(treeHoldRightRef.current),
+            duration: formatTime(secondsRef.current),
           }
         });
         return;
