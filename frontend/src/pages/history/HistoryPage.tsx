@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Activity, CheckCircle2, AlertCircle } from "lucide-react";
+import { Calendar, Activity, CheckCircle2, AlertCircle,History,Clock, Trophy } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -38,116 +38,127 @@ export function HistoryPage() {
       <div className="p-4 sm:p-6 space-y-8">
         {/* STATS SUMMARY */}
         <div className="grid grid-cols-2 gap-4">
-          <Card className="bg-primary text-primary-foreground border-none shadow-2xl shadow-primary/20 overflow-hidden relative group">
-            <div className="absolute -right-4 -top-4 bg-white/10 h-24 w-24 rounded-full transition-transform group-hover:scale-125 duration-500" />
-            <CardContent className="p-6 relative z-10">
-              <div className="text-3xl font-black">{sessions.length}</div>
-              <div className="text-[10px] opacity-70 uppercase font-bold tracking-[0.2em] mt-1">Sessions</div>
-            </CardContent>
+          <Card className="md:col-span-1 bg-[var(--primary-solid)] rounded-2xl p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+              <div className="bg-[var(--bg-dashboard)]/60 dark:bg-emerald-950/40 p-2.5 rounded-full flex items-center justify-center">
+                <Trophy className="h-5 w-5 text-[var(--primary-light)] dark:text-emerald-400" />
+              </div>
+              <span className="text-xs uppercase font-bold text-[var(--bg-dashboard)] tracking-wider">
+                sessions
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-black text-[var(--bg-dashboard)] tracking-tight">
+                {totalMinutes}
+              </span>
+              <span className="text-sm font-medium text-[var(--border-card)]/60">
+                mins
+              </span>
+            </div>
           </Card>
-          <Card className="border-none bg-white dark:bg-neutral-900 shadow-sm overflow-hidden relative group">
-            <div className="absolute -right-4 -top-4 bg-primary/5 h-24 w-24 rounded-full transition-transform group-hover:scale-125 duration-500" />
-            <CardContent className="p-6 relative z-10">
-              <div className="text-3xl font-black text-primary">{totalMinutes}</div>
-              <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em] mt-1">Active Mins</div>
-            </CardContent>
+          <Card className="md:col-span-1 bg-white rounded-2xl p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-full flex items-center justify-center">
+                <Clock className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+              </div>
+              <span className="text-xs uppercase font-bold text-emerald-700 dark:text-emerald-400 tracking-wider">
+                Active Mins
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-black text-neutral-800 dark:text-neutral-100 tracking-tight">
+                {totalMinutes}
+              </span>
+              <span className="text-sm font-medium text-neutral-400">
+                mins
+              </span>
+            </div>
           </Card>
         </div>
 
         {/* TIMELINE */}
-        <div className="space-y-4">
-          <h3 className="text-xs uppercase font-black text-neutral-400 tracking-widest pl-1">Recent Activity</h3>
-          
-          {sessions.length > 0 ? (
-            <div className="space-y-3">
-              {sessions.map((session) => {
-                const errors = session.metadata?.form_errors || [];
-                const hasErrors = errors.length > 0;
-                
-                return (
-                  <Card key={session.id} className="group hover:border-primary/30 transition-all border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="flex">
-                        {/* LEFT STRIP */}
-                        <div className={`w-1.5 ${hasErrors ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                        
-                        <div className="flex-1 p-5">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="space-y-1">
-                              <div className="text-[10px] font-bold text-primary uppercase tracking-tighter">
-                                {session.workout_type}
-                              </div>
-                              <h4 className="font-black text-xl tracking-tight text-neutral-900 dark:text-white uppercase italic">
-                                {session.exercise_name || session.title}
-                              </h4>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[10px] font-black text-neutral-400 block uppercase">
-                                {new Date(session.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                              </span>
-                              <span className="text-[10px] font-medium text-neutral-300">
-                                {new Date(session.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          </div>
+        <div className="bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 rounded-xl overflow-hidden shadow-sm">
+        {/* HEADER */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-neutral-800">
+          <div className="flex items-center gap-2 text-neutral-800 dark:text-neutral-200 font-bold text-sm">
+            <History className="h-4 w-4 text-neutral-500" />
+            <span>Recent Activity</span>
+          </div>
+          <span className="text-xs text-neutral-400 font-medium">
+            {sessions.length} {sessions.length === 1 ? 'entry' : 'entries'}
+          </span>
+        </div>
 
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
-                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">
-                                {session.metadata?.pose_type === 'static_hold' ? 'Hold' : 'Reps'}
-                              </span>
-                              <span className="text-lg font-black">
-                                {session.metadata?.pose_type === 'static_hold'
-                                  ? `${Math.max(session.metadata.left_leg_hold_seconds || 0, session.metadata.right_leg_hold_seconds || 0)}s`
-                                  : session.reps || 0}
-                              </span>
-                            </div>
-                            <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
-                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">Time</span>
-                              <span className="text-lg font-black">{session.duration_minutes}m</span>
-                            </div>
-                            <div className="bg-neutral-50 dark:bg-black/40 rounded-xl p-3 border border-neutral-100 dark:border-white/5">
-                              <span className="text-[8px] uppercase font-bold text-neutral-400 block mb-1">Result</span>
-                              <div className="flex items-center gap-1">
-                                {hasErrors ? (
-                                  <>
-                                    <AlertCircle className="h-3 w-3 text-amber-500" />
-                                    <span className="text-[10px] font-bold text-white">Adjust</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                                    <span className="text-[10px] font-bold text-white">Perfect</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {hasErrors && (
-                            <div className="mt-4 pt-4 border-t border-dashed border-neutral-100 dark:border-neutral-800">
-                               <span className="text-[9px] font-bold text-neutral-400 block mb-2 uppercase tracking-wider">Form Corrections:</span>
-                               <div className="flex flex-wrap gap-2">
-                                 {Array.from(new Set(errors.map((e: any) => e.error_type))).map((errorType: any, idx: number) => {
-                                   const formattedError = String(errorType).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                   const count = errors.filter((e: any) => e.error_type === errorType).length;
-                                   return (
-                                     <Badge key={idx} variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px] font-bold">
-                                       {formattedError} ({count}x)
-                                     </Badge>
-                                   );
-                                 })}
-                               </div>
-                            </div>
-                          )}
-                        </div>
+        {/* SESSIONS LIST */}
+        {sessions.length > 0 ? (
+          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+            {sessions.map((session) => {
+              const errors = session.metadata?.form_errors || [];
+              const hasErrors = errors.length > 0;
+              
+              return (
+                <div key={session.id} className="group relative flex items-center justify-between p-6 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
+                  {/* LEFT INDICATOR STRIP */}
+                  <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-r ${hasErrors ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                  
+                  {/* MAIN CONTENT BLOCK */}
+                  <div className="flex items-center justify-between w-full pl-3 pr-2">
+                    
+                    {/* LEFT SIDE: EXERCISE INFO */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-950/40 px-2 py-0.5 rounded uppercase tracking-wider">
+                          {session.workout_type}
+                        </span>
+                        <span className="text-xs font-medium text-neutral-400">
+                          {new Date(session.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · {new Date(session.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
+                      <h4 className="font-bold text-sm text-neutral-800 dark:text-neutral-100">
+                        {session.exercise_name || session.title}
+                      </h4>
+                    </div>
+
+                    {/* RIGHT SIDE: METRICS COLUMNS */}
+                    <div className="flex items-center gap-8 text-center">
+                      
+                      {/* REPS / HOLD */}
+                      <div className="w-12">
+                        <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider mb-0.5">
+                          {session.metadata?.pose_type === 'static_hold' ? 'Hold' : 'Reps'}
+                        </span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                          {session.metadata?.pose_type === 'static_hold'
+                            ? `${Math.max(session.metadata.left_leg_hold_seconds || 0, session.metadata.right_leg_hold_seconds || 0)}s`
+                            : session.reps || 0}
+                        </span>
+                      </div>
+
+                      {/* TIME */}
+                      <div className="w-12">
+                        <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider mb-0.5">Time</span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                          {session.duration_minutes}m
+                        </span>
+                      </div>
+
+                      {/* RESULT */}
+                      <div className="w-12 flex flex-col items-center">
+                        <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider mb-1">Result</span>
+                        {hasErrors ? (
+                          <AlertCircle className="h-5 w-5 text-amber-500 bg-amber-50 dark:bg-amber-950/20 rounded-full" />
+                        ) : (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 rounded-full" />
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )  : (
             <div className="text-center py-20 px-8 bg-white dark:bg-neutral-900 rounded-3xl border-2 border-dashed border-neutral-200 dark:border-neutral-800">
               <Activity className="h-16 w-16 mx-auto mb-6 text-neutral-200" />
               <h3 className="text-lg font-bold text-neutral-400">Fresh start!</h3>
