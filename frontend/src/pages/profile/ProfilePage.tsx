@@ -103,7 +103,7 @@ export function ProfilePage() {
       
       <div className="p-4 sm:p-6 space-y-6">
         <div className="flex flex-col items-center text-center pb-6 border-b">
-          <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4 border-2 border-primary/20 shadow-xl">
+          <div className="h-24 w-24 rounded-full bg-[var(--primary-solid)]/10 flex items-center justify-center text-primary mb-4 border-2 border-primary/20 shadow-xl">
             <span className="text-3xl font-black">{user?.name?.charAt(0) || 'U'}</span>
           </div>
           <h2 className="text-2xl font-black">{user?.name || 'User'}</h2>
@@ -121,7 +121,7 @@ export function ProfilePage() {
               >
                 <CardContent className="p-4 flex flex-col cursor-pointer" onClick={() => toggleSection(section.id)}>
                   <div className="flex items-center gap-4">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-muted text-foreground'}`}>
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-[var(--primary-solid)] text-primary-foreground shadow-lg shadow-primary/20' : 'bg-muted text-foreground'}`}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1 font-bold text-base">{section.label}</div>
