@@ -139,7 +139,11 @@ export function isCurlExercise(exercise: Exercise): boolean {
 }
 
 export function isStaticHoldExercise(exercise: Exercise): boolean {
-  return exercise.pose_type === 'static_hold' || exercise.name.toLowerCase().includes('tree');
+  const name = exercise.name.toLowerCase();
+  return exercise.pose_type === 'static_hold'
+    || name.includes('tree')
+    || name.includes('butterfly')
+    || name.includes('baddha');
 }
 
 // ----------------------------------------------------------------

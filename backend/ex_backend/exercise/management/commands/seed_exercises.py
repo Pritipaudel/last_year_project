@@ -31,7 +31,7 @@ EXERCISES = [
         "name": "Squat",
         "muscle_group": "Legs",
         "difficulty": "Beginner",
-        "image_url": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=500&q=80",
+        "image_url": "/images/squat.png",
         "description": (
             "A fundamental compound lower-body exercise targeting the quadriceps, "
             "glutes, and hamstrings. Stand with feet shoulder-width apart, lower "
@@ -39,7 +39,7 @@ EXERCISES = [
         ),
         # Relevant for all three goals — squats burn calories (weight_loss),
         # build muscle (weight_gain), and suit general fitness programmes.
-        "goal_tags": ["weight_loss", "weight_gain", "general"],
+        "goal_tags": ["weight_loss", "weight_gain", "general", "stay_active"],
 
         # MediaPipe interior knee angle (Hip→Knee→Ankle).
         # standing_threshold: below this = "descending" state begins.
@@ -139,7 +139,7 @@ EXERCISES = [
         "name": "Dumbbell Bicep Curl",
         "muscle_group": "Arms",
         "difficulty": "Beginner",
-        "image_url": "https://images.unsplash.com/photo-1581009137042-c552e485697a?w=500&q=80",
+        "image_url": "/images/bicep_curl.png",
         "description": (
             "A fundamental isolation exercise targeting the biceps brachii, brachialis, "
             "and brachioradialis. Hold a dumbbell in each hand with palms facing forward. "
@@ -312,7 +312,7 @@ EXERCISES = [
         "name": "Tree Pose (Vrksasana)",
         "muscle_group": "Balance & Flexibility",
         "difficulty": "Beginner",
-        "image_url": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&q=80",
+        "image_url": "/images/tree_pose.png",
         "description": (
             "A foundational yoga balance posture (Vrksasana) that builds single-leg stability, "
             "hip flexibility, and core alignment. Stand on one leg and place the raised foot "
@@ -471,6 +471,152 @@ EXERCISES = [
                 "foot_too_low":    "No rush — your foot is comfortable where it is. Hold steady.",
                 "arms_asymmetric": "Softly adjust your hands to a comfortable and level position.",
                 "forward_head":    "Softly bring your chin back and feel tall through the top of your head.",
+            },
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # BUTTERFLY POSE (Baddha Konasana) — Flexibility (Static Hold)
+    # ------------------------------------------------------------------
+    {
+        "name": "Butterfly Pose (Baddha Konasana)",
+        "muscle_group": "Balance & Flexibility",
+        "difficulty": "Beginner",
+        "image_url": "/images/butterfly_pose.png",
+        "description": (
+            "A seated hip-opening posture (Baddha Konasana) that stretches the inner "
+            "thighs, groin, adductors, and hip external rotators. Sit on the floor with "
+            "the soles of your feet pressed together and your knees dropped out to the "
+            "sides. Hold your feet or ankles, lengthen your spine upright, and breathe "
+            "steadily. Allow gravity to gently open your hips. Hold for the target "
+            "duration without forcing deeper range."
+        ),
+        "goal_tags": ["flexibility"],
+
+        # angle_ranges repurposed as alignment_thresholds for seated pose.
+        # knee_drop_ratio: (knee_y - hip_y) / torso_height — positive means knees dropped.
+        # Lower threshold = knees must drop further to count as 'good'.
+        "angle_ranges": {
+            "18-25": {
+                "knee_drop_ratio_min": 0.10,
+                "knee_drop_ratio_high_warning": 0.25,
+                "trunk_lean_max": 0.18,
+                "shoulder_elevation_threshold": 0.05,
+                "head_drop_threshold": 0.08,
+                "feet_apart_threshold": 0.15,
+                "min_hold_frames": 5,
+                "wrist_height_symmetry_threshold": None,
+                "forward_head_threshold": 0.08,
+            },
+            "26-40": {
+                "knee_drop_ratio_min": 0.05,
+                "knee_drop_ratio_high_warning": 0.30,
+                "trunk_lean_max": 0.18,
+                "shoulder_elevation_threshold": 0.05,
+                "head_drop_threshold": 0.08,
+                "feet_apart_threshold": 0.15,
+                "min_hold_frames": 5,
+                "wrist_height_symmetry_threshold": None,
+                "forward_head_threshold": 0.08,
+            },
+            "41-60": {
+                "knee_drop_ratio_min": 0.0,
+                "knee_drop_ratio_high_warning": 0.40,
+                "trunk_lean_max": 0.22,
+                "shoulder_elevation_threshold": 0.06,
+                "head_drop_threshold": 0.10,
+                "feet_apart_threshold": 0.18,
+                "min_hold_frames": 4,
+                "wrist_height_symmetry_threshold": None,
+                "forward_head_threshold": 0.10,
+            },
+            "60+": {
+                "knee_drop_ratio_min": 0.0,
+                "knee_drop_ratio_high_warning": 0.50,
+                "trunk_lean_max": 0.25,
+                "shoulder_elevation_threshold": 0.07,
+                "head_drop_threshold": 0.12,
+                "feet_apart_threshold": 0.20,
+                "min_hold_frames": 3,
+                "wrist_height_symmetry_threshold": None,
+                "forward_head_threshold": 0.12,
+            },
+        },
+
+        # rep_config used as hold_config — same structure as Tree Pose.
+        "rep_config": {
+            "18-25": {
+                "target_hold_seconds": 60,
+                "variant_name": "Full Butterfly",
+                "standing_position": "seated_floor",
+                "foot_placement": "soles_together",
+                "foot_placement_landmark": "ankle",
+                "safety_note": None,
+                "grace_period_seconds": 3,
+            },
+            "26-40": {
+                "target_hold_seconds": 45,
+                "variant_name": "Butterfly Pose",
+                "standing_position": "seated_floor",
+                "foot_placement": "soles_together",
+                "foot_placement_landmark": "ankle",
+                "safety_note": None,
+                "grace_period_seconds": 3,
+            },
+            "41-60": {
+                "target_hold_seconds": 30,
+                "variant_name": "Supported Butterfly",
+                "standing_position": "seated_raised_optional",
+                "foot_placement": "soles_together",
+                "foot_placement_landmark": "ankle",
+                "safety_note": (
+                    "Consider sitting on a folded blanket to tilt pelvis forward. "
+                    "ACSM recommends prop use when hip flexion ROM is reduced."
+                ),
+                "grace_period_seconds": 3,
+            },
+            "60+": {
+                "target_hold_seconds": 20,
+                "variant_name": "Gentle Butterfly",
+                "standing_position": "seated_chair_or_raised",
+                "foot_placement": "soles_together",
+                "foot_placement_landmark": "ankle",
+                "safety_note": (
+                    "Sit on a chair or raised surface if floor sitting is uncomfortable. "
+                    "Do not force the knees down — let gravity work gently."
+                ),
+                "grace_period_seconds": 4,
+            },
+        },
+
+        "voice_cues": {
+            "18-25": {
+                "spine_rounded":   "Sit tall — lengthen your spine and lift your chest.",
+                "shoulders_raised":"Drop your shoulders away from your ears. Relax your upper body.",
+                "head_dropped":    "Lift your chin — keep your gaze forward.",
+                "knees_too_high":  "Relax your hips and let your knees drop lower.",
+                "feet_apart":      "Bring the soles of your feet together — press them firmly.",
+            },
+            "26-40": {
+                "spine_rounded":   "Sit tall — lengthen your spine and lift your chest.",
+                "shoulders_raised":"Drop your shoulders away from your ears. Relax your upper body.",
+                "head_dropped":    "Lift your chin — keep your gaze forward.",
+                "knees_too_high":  "Relax your hips and let your knees drop lower.",
+                "feet_apart":      "Bring the soles of your feet together — press them firmly.",
+            },
+            "41-60": {
+                "spine_rounded":   "Gently lift through the crown of your head and straighten your back.",
+                "shoulders_raised":"Soften your shoulders downward and breathe out.",
+                "head_dropped":    "Gently bring your chin level with the floor.",
+                "knees_too_high":  "Gently allow your knees to soften downward toward the floor.",
+                "feet_apart":      "Try to bring your feet a little closer together.",
+            },
+            "60+": {
+                "spine_rounded":   "Take a breath in and slowly sit a little taller — no rush.",
+                "shoulders_raised":"Gently let your shoulders melt down. You are doing well.",
+                "head_dropped":    "Softly raise your head and look ahead of you.",
+                "knees_too_high":  "Take your time — breathe out and let your knees slowly relax.",
+                "feet_apart":      "Gently bring your feet together when you feel comfortable.",
             },
         },
     },

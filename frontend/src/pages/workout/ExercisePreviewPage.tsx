@@ -35,9 +35,9 @@ export function ExercisePreviewPage() {
   return (
     <PageTransition variant="slide" className="flex flex-col min-h-screen">
       <Header title="Exercise Detail" showBack onBack={() => navigate(-1)} />
-      
+
       <div className="flex-1 overflow-y-auto p-4">
-        <div 
+        <div
           className="h-64 w-full bg-cover bg-center"
           style={{ backgroundImage: `url(${exercise.imageUrl})` }}
         >
@@ -74,16 +74,16 @@ export function ExercisePreviewPage() {
               <li>Repeat for the designated number of repetitions.</li>
             </ol>
           </div>
-          <Button 
-          className="w-full" 
-          size="lg"
-          onClick={() => navigate(`/workout/active?id=${exercise.id}`)}
-        >
-          Begin Exercise
-        </Button>
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={() => navigate(`/workout/active?id=${exercise.id}`)}
+          >
+            Begin Exercise
+          </Button>
         </div>
       </div>
-        
+
     </PageTransition>
   );
 }

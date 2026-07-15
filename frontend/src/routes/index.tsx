@@ -22,6 +22,10 @@ import { ExercisePreviewPage } from "@/pages/workout/ExercisePreviewPage";
 import { ActiveWorkoutPage } from "@/pages/workout/ActiveWorkoutPage";
 import { SessionSummaryPage } from "@/pages/workout/SessionSummaryPage";
 import { DoctorSearchPage } from "@/pages/doctor/DoctorSearchPage";
+import { DoctorProfilePage } from "@/pages/doctor/DoctorProfilePage";
+import { AppointmentBookingPage } from "@/pages/doctor/AppointmentBookingPage";
+import { DoctorChatPage } from "@/pages/doctor/DoctorChatPage";
+import { DoctorCallPage } from "@/pages/doctor/DoctorCallPage";
 import { HistoryPage } from "@/pages/history/HistoryPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
 
@@ -71,6 +75,10 @@ export const router = createBrowserRouter([
           { path: ROUTES.ACTIVE_WORKOUT, element: <ActiveWorkoutPage /> },
           { path: ROUTES.SESSION_SUMMARY, element: <SessionSummaryPage /> },
           { path: ROUTES.DOCTORS, element: <DoctorSearchPage /> },
+          { path: "/doctors/:id", element: <DoctorProfilePage /> },
+          { path: "/doctors/:id/book", element: <AppointmentBookingPage /> },
+          { path: "/doctors/:id/chat", element: <DoctorChatPage /> },
+          { path: "/doctors/:id/call", element: <DoctorCallPage /> },
           { path: ROUTES.HISTORY, element: <HistoryPage /> },
           { path: ROUTES.PROFILE, element: <ProfilePage /> },
         ],

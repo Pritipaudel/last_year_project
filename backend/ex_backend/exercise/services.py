@@ -160,22 +160,43 @@ def _personalize(user, exercise: Exercise, band: str, goal_tag: str) -> dict:
     except Exception:
         pass
 
-    is_static_hold = 'tree' in exercise.name.lower() or 'vrksasana' in exercise.name.lower()
+    is_static_hold = (
+        'tree' in exercise.name.lower() 
+        or 'vrksasana' in exercise.name.lower()
+        or 'butterfly' in exercise.name.lower()
+        or 'baddha' in exercise.name.lower()
+    )
     is_curl = 'curl' in exercise.name.lower()
 
     if is_static_hold:
-        priority_order = [
-            'trunk_sway',        # P1 — safety, fire immediately
-            'hip_unlevel',       # P2 — form
-            'knee_bent',         # P2 — form
-            'foot_too_low',      # P3 — alignment
-            'arms_asymmetric',   # P3 — alignment
-            'forward_head',      # P3 — alignment (elevates to P2 if flagged)
-        ]
+        is_butterfly = 'butterfly' in exercise.name.lower() or 'baddha' in exercise.name.lower()
+        
+        if is_butterfly:
+            priority_order = [
+                'spine_rounded',      # P1 — lumbar safety
+                'shoulders_raised',   # P2
+                'head_dropped',       # P2
+                'knees_too_high',     # P3
+                'feet_apart',         # P3
+            ]
+            
+            if deviations.get('anterior_pelvic_tilt') or deviations.get('excessive_lordosis'):
+                if 'spine_rounded' in priority_order:
+                    priority_order.remove('spine_rounded')
+                    priority_order.insert(0, 'spine_rounded')
+        else:
+            priority_order = [
+                'trunk_sway',        # P1 — safety, fire immediately
+                'hip_unlevel',       # P2 — form
+                'knee_bent',         # P2 — form
+                'foot_too_low',      # P3 — alignment
+                'arms_asymmetric',   # P3 — alignment
+                'forward_head',      # P3 — alignment (elevates to P2 if flagged)
+            ]
 
-        if deviations.get('forward_head') or deviations.get('rounded_shoulders'):
-            priority_order.remove('forward_head')
-            priority_order.insert(2, 'forward_head')  # Insert at P2 position
+            if deviations.get('forward_head') or deviations.get('rounded_shoulders'):
+                priority_order.remove('forward_head')
+                priority_order.insert(2, 'forward_head')  # Insert at P2 position
 
         band_cues_prioritised = {k: band_cues_raw.get(k, '') for k in priority_order}
 

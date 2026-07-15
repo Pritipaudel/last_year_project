@@ -112,7 +112,7 @@ export function DashboardPage() {
                     setIsUpdatingGoal(true);
                     try {
                       await biometricService.updateProfile({ goal: newGoal });
-                      const { data } = await exerciseService.getExercises();
+                      const data = await exerciseService.getExercises();
                       setExercises(data || []);
                     } catch (e) {
                       console.error("Failed to update goal");

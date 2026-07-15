@@ -8,6 +8,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { initializeCamera, stopCamera, processPose } from "@/lib/camera_mediapipe";
 import { createCurlTracker } from "@/lib/curl_tracking";
 import { createTreePoseTracker } from "@/lib/tree_pose_tracking";
+import { createButterflyTracker } from "@/lib/butterfly_tracking";
 
 // ================================================================
 // VISIBILITY HELPERS
@@ -75,6 +76,7 @@ export function ActiveWorkoutPage() {
   // ---- TRACKER REFS ----
   const curlTrackerRef = useRef<ReturnType<typeof createCurlTracker> | null>(null);
   const treeTrackerRef = useRef<ReturnType<typeof createTreePoseTracker> | null>(null);
+  const butterflyTrackerRef = useRef<ReturnType<typeof createButterflyTracker> | null>(null);
 
   // Voice cooldown management (used by all engines)
   const lastSpokeAt = useRef<Record<string, number>>({});
@@ -196,17 +198,30 @@ export function ActiveWorkoutPage() {
       );
     }
 
-    if (isStatic && !treeTrackerRef.current) {
+    if (isStatic) {
       const p = exercise.personalization;
       setTreeTarget(p.hold_config?.target_hold_seconds || 20);
-      treeTrackerRef.current = createTreePoseTracker(
-        p as any,
-        speak,
-        (type: string, _leg: string, ts: number) => {
-          sessionErrors.current.push({ error_type: type, timestamp: String(ts) });
-        },
-        () => Date.now()
-      );
+      const isButterfly = exercise.name.toLowerCase().includes('butterfly') || exercise.name.toLowerCase().includes('baddha');
+
+      if (isButterfly && !butterflyTrackerRef.current) {
+        butterflyTrackerRef.current = createButterflyTracker(
+          p as any,
+          speak,
+          (type: string, _leg: string, ts: number) => {
+            sessionErrors.current.push({ error_type: type, timestamp: String(ts) });
+          },
+          () => Date.now()
+        );
+      } else if (!isButterfly && !treeTrackerRef.current) {
+        treeTrackerRef.current = createTreePoseTracker(
+          p as any,
+          speak,
+          (type: string, _leg: string, ts: number) => {
+            sessionErrors.current.push({ error_type: type, timestamp: String(ts) });
+          },
+          () => Date.now()
+        );
+      }
     }
 
     const stopPose = processPose(videoRef.current, canvasRef.current, (results) => {
@@ -215,11 +230,17 @@ export function ActiveWorkoutPage() {
       if (!ex || !landmarks) return;
       if (isPausedRef.current) return;
 
-      if (isStatic && treeTrackerRef.current) {
-        // The tracker itself handles all phase detection, visibility checking,
-        // and voice feedback. We just feed it landmarks and update UI.
-        const now = Date.now();
-        const result = treeTrackerRef.current.processFrame(landmarks, now);
+      if (isStatic) {
+        const isButterfly = ex.name.toLowerCase().includes('butterfly') || ex.name.toLowerCase().includes('baddha');
+        let result: any;
+        
+        if (isButterfly && butterflyTrackerRef.current) {
+          result = butterflyTrackerRef.current.processFrame(landmarks, Date.now());
+        } else if (!isButterfly && treeTrackerRef.current) {
+          result = treeTrackerRef.current.processFrame(landmarks, Date.now());
+        } else {
+          return;
+        }
 
         // Update tracking status for the header HUD
         if (result.phase === 'invisible') {
@@ -241,6 +262,7 @@ export function ActiveWorkoutPage() {
           return;
         }
 
+        const now = Date.now();
         if (now - lastUiUpdateAt.current > 100) {
           setTreeHoldLeft(result.leftLeg.holdSeconds);
           setTreeHoldRight(result.rightLeg.holdSeconds);
@@ -511,19 +533,28 @@ export function ActiveWorkoutPage() {
               </>
             ) : isStatic ? (
               <>
-                <div className="flex flex-col items-center">
-                  <span className={`text-[7px] uppercase font-black ${treeIsHolding && treeActiveLeg === 'left' ? 'text-green-400' : 'text-blue-400'}`}>L LEG</span>
-                  <span className="text-lg font-black">{Math.floor(treeHoldLeft)}s</span>
-                </div>
+                {(exercise?.name.toLowerCase().includes('butterfly') || exercise?.name.toLowerCase().includes('baddha')) ? (
+                  <div className="flex flex-col items-center">
+                    <span className={`text-[7px] uppercase font-black ${treeIsHolding ? 'text-green-400' : 'text-blue-400'}`}>HOLD</span>
+                    <span className="text-lg font-black">{Math.floor(treeHoldLeft)}s</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col items-center">
+                      <span className={`text-[7px] uppercase font-black ${treeIsHolding && treeActiveLeg === 'left' ? 'text-green-400' : 'text-blue-400'}`}>L LEG</span>
+                      <span className="text-lg font-black">{Math.floor(treeHoldLeft)}s</span>
+                    </div>
+                    <div className="w-[1px] h-4 bg-white/10" />
+                    <div className="flex flex-col items-center">
+                      <span className={`text-[7px] uppercase font-black ${treeIsHolding && treeActiveLeg === 'right' ? 'text-green-400' : 'text-blue-400'}`}>R LEG</span>
+                      <span className="text-lg font-black">{Math.floor(treeHoldRight)}s</span>
+                    </div>
+                  </>
+                )}
                 <div className="w-[1px] h-4 bg-white/10" />
                 <div className="flex flex-col items-center">
                   <span className="text-[7px] uppercase font-black text-primary">TARGET</span>
                   <span className="text-xl font-black">{treeTarget}s</span>
-                </div>
-                <div className="w-[1px] h-4 bg-white/10" />
-                <div className="flex flex-col items-center">
-                  <span className={`text-[7px] uppercase font-black ${treeIsHolding && treeActiveLeg === 'right' ? 'text-green-400' : 'text-blue-400'}`}>R LEG</span>
-                  <span className="text-lg font-black">{Math.floor(treeHoldRight)}s</span>
                 </div>
               </>
             ) : (

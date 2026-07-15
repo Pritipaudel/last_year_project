@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'exercise',
     'accounts',
     'biometrics',
+    'doctors',
 ]
 
 REST_FRAMEWORK = {
