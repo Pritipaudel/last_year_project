@@ -74,7 +74,7 @@ export function DashboardPage() {
                     Welcome back
                   </span>
                 </div>
-                <h2 className="text-2xl font-extrabold mt-1" style={{ color: "#fff" }}>Hello, Test! </h2>
+                <h2 className="text-2xl font-extrabold mt-1" style={{ color: "#fff" }}>Hello, {user?.name || 'User'}! </h2>
                 <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.8)" }}>Ready for your workout today?</p>
               </div>
               <Button
