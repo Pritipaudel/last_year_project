@@ -229,9 +229,9 @@ export function PhysiologicalProfilePage() {
                 <div 
                   className="p-5 rounded-xl border-2 transition-all duration-300"
                   style={{
-                    borderColor: bmi ? 'rgba(70, 130, 180, 0.4)' : '#E2E8F0',
+                    borderColor: bmi ? 'rgba(77, 184, 169, 0.4)' : '#E2E8F0',
                     borderStyle: bmi ? 'solid' : 'dashed',
-                    background: bmi ? 'rgba(70, 130, 180, 0.04)' : 'transparent',
+                    background: bmi ? 'rgba(30, 145, 55, 0.04)' : 'transparent',
                     opacity: bmi ? 1 : 0.5,
                   }}
                 >
@@ -240,8 +240,8 @@ export function PhysiologicalProfilePage() {
                   </p>
                   {bmi ? (
                     <div className="flex items-end gap-2">
-                       <p className="text-3xl font-bold" style={{ color: '#4682B4' }}>{bmi}</p>
-                       <span className="text-sm pb-1 font-medium tracking-wide" style={{ color: 'rgba(70, 130, 180, 0.8)' }}>
+                       <p className="text-3xl font-bold" style={{ color: '#2d8543' }}>{bmi}</p>
+                       <span className="text-sm pb-1 font-medium tracking-wide" style={{ color: 'rgba(33, 114, 73, 0.8)' }}>
                         {parseFloat(bmi) < 18.5 ? 'UNDERWEIGHT' : parseFloat(bmi) < 25 ? 'HEALTHY RANGE' : parseFloat(bmi) < 30 ? 'OVERWEIGHT' : 'OBESE'}
                        </span>
                     </div>
