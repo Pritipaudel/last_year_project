@@ -51,7 +51,7 @@ export function ExerciseSelectionPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             leftIcon={<Search className="h-4 w-4" />}
-            className="flex-1"
+            className="flex-1 bg-[var(--primary-light)]/20 border-[var(--primary-light)]/30 focus-visible:ring-[var(--primary-light)]/70"
           />
           <Button variant="outline" size="icon">
             <Filter className="h-4 w-4" />
