@@ -143,7 +143,7 @@ export function DashboardPage() {
             {recentSessions.length>0?<Trophy size={48} style={{
               stroke: "var(--primary-light)"
             }}
-            />:<Trophy size={48} color="#837c7c" fill="#000000"
+            />:<Trophy size={48} color="#e5d72f"
             />}
           </div>
             <span className="uppercase text-[10px] font-bold tracking-widest text-[var(--text-muted)]">Total</span>
@@ -163,7 +163,7 @@ export function DashboardPage() {
         <Card className="bg-[var(--accent-surface)] border-transparent p-6 flex flex-col justify-between">
           <div className="w-full h-16 flex items-center justify-center text-[var(--coral-text)]">
             {recentSessions.length>0?<Flame size={48} color="#ea580c" fill="#f97316"
-    />:<Flame size={48} color="#837c7c" fill="#000000"
+    />:<Flame size={48} color="#FBB741" fill="#FBB741"
     />}
           </div>
           <div className="w-full text-center mt-2">
