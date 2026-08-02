@@ -104,12 +104,6 @@ export function CameraPermissionPage() {
         >
           Allow Camera
         </Button>
-        <button
-          onClick={handleSkip}
-          className="w-full text-center py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Maybe Later
-        </button>
       </div>
     </PageTransition>
   );

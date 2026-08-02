@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, Upload, CheckCircle2, RotateCcw, ThumbsUp } from "lucide-react";
+import { Camera, CheckCircle2, RotateCcw, ThumbsUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -16,7 +16,7 @@ export function BodyPhotoPage() {
   const { addToast } = useUIStore();
   const [photoCaptured, setPhotoCaptured] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastAssessmentRef = useRef<any>(null);
@@ -47,17 +47,31 @@ export function BodyPhotoPage() {
   };
 
   const syncProfile = async () => {
-     try {
-       // Ensure user has a profile first (this triggers get_or_create on backend)
-       await biometricService.saveProfile({ goal: 'assessment_init' });
-     } catch (e) {
-       console.error("Profile sync failed", e);
-     }
+    try {
+      // Ensure user has a profile first (this triggers get_or_create on backend)
+      await biometricService.saveProfile({ goal: 'assessment_init' });
+    } catch (e) {
+      console.error("Profile sync failed", e);
+    }
   };
 
   const handleCapture = async () => {
     if (!lastAssessmentRef.current) {
       addToast({ title: "Analysis Active", description: "Please wait for landmarks to position correctly.", type: "warning" });
+      return;
+    }
+
+    const landmarks = lastAssessmentRef.current.landmarks;
+    if (!landmarks || landmarks.length < 33) {
+      addToast({ title: "Full Body Required", description: "Could not detect your body. Step into the frame.", type: "warning" });
+      return;
+    }
+
+    // Require all 33 landmarks to be visible (visibility > 0.65)
+    // The user requested: "when our whole body all 33 landmarks are visible than only the image should be accepted"
+    const isFullyVisible = landmarks.every((l: any) => l.visibility && l.visibility > 0.65);
+    if (!isFullyVisible) {
+      addToast({ title: "Full Body Required", description: "Please ensure your entire body (head to toes) is clearly visible in the frame.", type: "warning" });
       return;
     }
 
@@ -90,7 +104,7 @@ export function BodyPhotoPage() {
       try {
         // Stop camera before showing "Captured" UI
         stopCamera(videoRef.current!);
-        
+
         await biometricService.submitAssessment(payload);
         setPhotoCaptured(true);
         setField("photoTaken", true);
@@ -170,10 +184,10 @@ export function BodyPhotoPage() {
         )}
 
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-           <p className="text-xs text-slate-500 leading-relaxed text-center">
-             <span className="font-bold">Privacy Guarantee:</span> Your image is analyzed in the browser. 
-             Calculated skeletal data is stored securely for your coach to review.
-           </p>
+          <p className="text-xs text-slate-500 leading-relaxed text-center">
+            <span className="font-bold">Privacy Guarantee:</span> Your image is analyzed in the browser.
+            Calculated skeletal data is stored securely for your coach to review.
+          </p>
         </div>
       </div>
     </PageTransition>

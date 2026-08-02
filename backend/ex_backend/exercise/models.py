@@ -63,6 +63,24 @@ class Exercise(models.Model):
         help_text='Per-age-band cue text strings keyed by error type'
     )
 
+    # --- Algorithm 4: Weighted Recommendation fields ---
+
+    # Which age bands this exercise is appropriate for.
+    # Values must be from: ["18-25", "26-40", "41-60", "60+"]
+    # Used by rank_exercises_by_suitability() for the 40-point age-band match score.
+    age_groups_allowed = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Age bands for which this exercise is appropriate, e.g. ["18-25", "26-40"]'
+    )
+
+    # Whether this exercise has high joint/cardiovascular impact (e.g. jumping, HIIT).
+    # Used by rank_exercises_by_suitability(): BMI > 30 + high_impact = -20 penalty.
+    high_impact = models.BooleanField(
+        default=False,
+        help_text='True if exercise has high joint load; penalised for users with BMI > 30'
+    )
+
     class Meta:
         ordering = ['name']
 

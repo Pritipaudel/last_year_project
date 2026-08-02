@@ -107,6 +107,8 @@ export interface SessionSummaryPayload {
   reps_left?: number;
   reps_right?: number;
   goal_context?: string;
+  /** Algorithm 3: EMA-smoothed joint angles recorded per frame. Sent to backend for form score. */
+  angle_readings?: number[];
 }
 
 export interface WorkoutSession {

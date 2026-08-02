@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from .models import BiometricProfile, PosturalAssessment
 from .serializers import BiometricProfileSerializer, PosturalAssessmentSerializer
 
-class ProfileUpdateView(generics.CreateAPIView, generics.RetrieveUpdateAPIView):
+class ProfileUpdateView(generics.CreateAPIView, generics.RetrieveUpdateAPIView, generics.DestroyAPIView):
     serializer_class = BiometricProfileSerializer
 
     def get_queryset(self):

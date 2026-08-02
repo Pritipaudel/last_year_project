@@ -108,9 +108,9 @@ class Command(BaseCommand):
             status_str = "Created" if created else "Updated"
             self.stdout.write(self.style.SUCCESS(f"{status_str} Doctor: {doctor.name}"))
 
-        # Seed Availability slots for the next 7 days (including today)
+        # Seed Availability slots for the next 30 days (including today)
         slots_count = 0
-        for i in range(7):
+        for i in range(30):
             query_date = today + timedelta(days=i)
             # Skip Sundays for availability seeding (doctors rest)
             if query_date.weekday() == 6:

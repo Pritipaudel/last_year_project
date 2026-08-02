@@ -1,13 +1,25 @@
 /**
  * MediaPipe Activation Script with Full Body Detection
  *
- * Exports calculateAngle so curl_tracking.ts can reuse it without duplicating code.
- * Results callback now includes elbow angles (bilateral), shoulder Y coords,
- * trunk angle and hip landmark positions for form error detection.
+ * Algorithm 1 (calculateAngle): Joint Angle Calculation using Vector Dot Product.
+ *   - Replaces the previous Math.atan2 approach with the named dot-product formula.
+ *   - Time: O(1), Space: O(1). See full explanation in the function JSDoc.
+ *
+ * Algorithm 2 (ema): Exponential Moving Average smoothing applied per joint
+ *   - Applied after angle calculation, before onResults callback fires.
+ *   - Time: O(1)/call, Space: O(k). See ema_smoothing.ts.
  */
+
+import { ExponentialMovingAverage } from './ema_smoothing';
 
 let poseInstance: any = null;
 let cameraInstance: any = null;
+
+// Algorithm 2: Single shared EMA instance for the entire camera session.
+// Tracks smoothed angle history for all named joints.
+// alpha = 0.3 chosen for ~15fps: smooths ~2-frame noise window (133ms lag),
+// within ACSM's 200ms feedback window for effective form cueing.
+const ema = new ExponentialMovingAverage(0.3);
 
 export async function initializeCamera(videoElement: HTMLVideoElement): Promise<boolean> {
     if (cameraInstance) {
@@ -46,7 +58,7 @@ export function stopCamera(videoElement?: HTMLVideoElement | null) {
         try {
             cameraInstance.stop();
             console.log("Camera instance stopped");
-        } catch(e) {
+        } catch (e) {
             console.error("Error stopping camera", e);
         }
         cameraInstance = null;
@@ -55,7 +67,7 @@ export function stopCamera(videoElement?: HTMLVideoElement | null) {
         try {
             poseInstance.close();
             console.log("Pose instance closed");
-        } catch(e) {
+        } catch (e) {
             console.error("Error closing pose", e);
         }
         poseInstance = null;
@@ -68,15 +80,64 @@ export function stopCamera(videoElement?: HTMLVideoElement | null) {
 }
 
 /**
- * Calculate the interior angle at point p2 (vertex) formed by p1–p2–p3.
- * Returns a value in degrees between 0 and 180.
- * Exported so curl_tracking.ts can reuse without duplicating.
+ * Algorithm 1: Joint Angle Calculation — Vector Dot Product Formula.
+ *
+ * NAME: Joint Angle Calculation (Vector Dot Product)
+ * TIME COMPLEXITY:  O(1) — fixed arithmetic operations regardless of input.
+ * SPACE COMPLEXITY: O(1) — only scalar variables; no arrays or objects allocated.
+ *
+ * WHY DOT PRODUCT (not atan2):
+ *   The atan2 approach computes the angle of each ray from origin and subtracts.
+ *   This can give inconsistent signs when the angle wraps past 180°. The dot
+ *   product formula directly computes the cosine of the angle between two vectors,
+ *   then applies acos — always giving a value in [0°, 180°] with no wrap-around.
+ *
+ * LINE-BY-LINE (for viva):
+ *   1. Build vector BA = A - B  (from vertex B toward point A).
+ *   2. Build vector BC = C - B  (from vertex B toward point C).
+ *   3. dot = BAx*BCx + BAy*BCy  (dot product = |BA||BC|cos(θ)).
+ *   4. Compute magnitudes: |BA| = sqrt(BAx²+BAy²), same for |BC|.
+ *   5. Edge case: zero magnitude → return 0 (coincident landmarks).
+ *   6. cosAngle = dot / (|BA| * |BC|).
+ *   7. Clamp cosAngle to [-1, 1] — guards against floating-point drift
+ *      that would make Math.acos return NaN.
+ *   8. angleRad = Math.acos(clamped)  → angle in radians.
+ *   9. Return angleRad * (180 / Math.PI)  → degrees in [0, 180].
+ *
+ * UNIT TEST:
+ *   calculateAngle({x:0,y:1},{x:0,y:0},{x:1,y:0}) === 90.0  (right angle)
  */
 export function calculateAngle(p1: any, p2: any, p3: any): number {
-    const radians = Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x);
-    let angle = Math.abs(radians * 180.0 / Math.PI);
-    if (angle > 180.0) angle = 360 - angle;
-    return angle;
+    // Step 1: Vector BA (from vertex p2 toward p1)
+    const baX = p1.x - p2.x;
+    const baY = p1.y - p2.y;
+
+    // Step 2: Vector BC (from vertex p2 toward p3)
+    const bcX = p3.x - p2.x;
+    const bcY = p3.y - p2.y;
+
+    // Step 3: Dot product  dot(BA, BC) = BAx*BCx + BAy*BCy
+    const dotProduct = baX * bcX + baY * bcY;
+
+    // Step 4: Magnitudes (Euclidean norm)
+    const magBA = Math.sqrt(baX * baX + baY * baY);
+    const magBC = Math.sqrt(bcX * bcX + bcY * bcY);
+
+    // Step 5: Edge case — zero-length vector means coincident landmarks
+    if (magBA === 0 || magBC === 0) return 0;
+
+    // Step 6: Cosine of the angle between the two vectors
+    const cosAngle = dotProduct / (magBA * magBC);
+
+    // Step 7: Clamp to [-1, 1] to guard against floating-point drift
+    // (e.g., 1.0000000003 would make Math.acos return NaN)
+    const clamped = Math.max(-1, Math.min(1, cosAngle));
+
+    // Step 8: Inverse cosine gives angle in radians
+    const angleRad = Math.acos(clamped);
+
+    // Step 9: Convert to degrees and return
+    return angleRad * (180 / Math.PI);
 }
 
 export function processPose(
@@ -85,13 +146,13 @@ export function processPose(
     onResults: (data: any) => void
 ) {
     const ctx = canvasElement.getContext('2d');
-    if (!ctx) return () => {};
+    if (!ctx) return () => { };
 
     // @ts-ignore
-    if (!window.Pose) return () => {};
+    if (!window.Pose) return () => { };
 
     // @ts-ignore
-    if (!window.Pose) return () => {};
+    if (!window.Pose) return () => { };
 
     // Reuse existing Pose instance to prevent expensive model reloading
     if (!poseInstance) {
@@ -101,7 +162,7 @@ export function processPose(
         });
 
         poseInstance.setOptions({
-            useCpuInference: false, 
+            useCpuInference: false,
             modelComplexity: 1,
             smoothLandmarks: true,
             minDetectionConfidence: 0.55,
@@ -110,7 +171,7 @@ export function processPose(
     }
 
     // Clear previous results callback to avoid memory leaks/double-firing
-    poseInstance.onResults(() => {}); 
+    poseInstance.onResults(() => { });
 
     poseInstance.onResults((results: any) => {
         if (!ctx) return;
@@ -130,9 +191,18 @@ export function processPose(
 
             let kneeAngle: number | null = null;
             if (rk && rh && ra && lk && lh && la) {
+                const confR = ((rh.visibility || 0) + (rk.visibility || 0) + (ra.visibility || 0)) / 3;
+                const confL = ((lh.visibility || 0) + (lk.visibility || 0) + (la.visibility || 0)) / 3;
                 const angleR = calculateAngle(rh, rk, ra);
                 const angleL = calculateAngle(lh, lk, la);
-                kneeAngle = (angleR + angleL) / 2;
+
+                if (confR > 0.7 && confL > 0.7) {
+                    kneeAngle = (angleR + angleL) / 2;
+                } else if (confR > confL && confR > 0.4) {
+                    kneeAngle = angleR;
+                } else if (confL > 0.4) {
+                    kneeAngle = angleL;
+                }
             }
 
             const spineAngle = (rs && rh) ? calculateAngle(rs, rh, { x: rh.x, y: rh.y - 1 }) : null;
@@ -164,24 +234,60 @@ export function processPose(
                 trunkAngleRight = calculateAngle(rs, rh, { x: rh.x, y: rh.y + 1 });
             }
 
+            // ---- ALGORITHM 2: EMA SMOOTHING ----
+            // Applied AFTER landmark extraction and angle calculation,
+            // BEFORE values are fed to the state machine / rep counter.
+            // Each joint angle is smoothed independently via the shared EMA instance.
+            // First call per joint bootstraps with the raw value (no lag).
+            // Subsequent calls blend: smoothed = 0.3 * raw + 0.7 * previous_smoothed
+            let smoothKneeAngle: number | null = null;
+            if (kneeAngle !== null) {
+                smoothKneeAngle = ema.smooth('knee', kneeAngle);
+            }
+
+            let smoothSpineAngle: number | null = null;
+            if (spineAngle !== null) {
+                smoothSpineAngle = ema.smooth('spine', spineAngle);
+            }
+
+            let smoothElbowLeft: number | null = null;
+            if (elbowAngleLeft !== null) {
+                smoothElbowLeft = ema.smooth('elbow_left', elbowAngleLeft);
+            }
+
+            let smoothElbowRight: number | null = null;
+            if (elbowAngleRight !== null) {
+                smoothElbowRight = ema.smooth('elbow_right', elbowAngleRight);
+            }
+
+            let smoothTrunkLeft: number | null = null;
+            if (trunkAngleLeft !== null) {
+                smoothTrunkLeft = ema.smooth('trunk_left', trunkAngleLeft);
+            }
+
+            let smoothTrunkRight: number | null = null;
+            if (trunkAngleRight !== null) {
+                smoothTrunkRight = ema.smooth('trunk_right', trunkAngleRight);
+            }
+
             onResults({
                 landmarks,
-                // Squat fields (unchanged)
-                knee_angle: kneeAngle,
-                spine_angle: spineAngle,
+                // Squat fields — EMA-smoothed
+                knee_angle: smoothKneeAngle,
+                spine_angle: smoothSpineAngle,
                 image: results.image,
-                // Curl fields — null if landmarks not visible
-                elbow_angle_left: elbowAngleLeft,
-                elbow_angle_right: elbowAngleRight,
-                // Raw landmark objects for form checks in curl_tracking.ts
+                // Curl fields — EMA-smoothed
+                elbow_angle_left: smoothElbowLeft,
+                elbow_angle_right: smoothElbowRight,
+                // Raw landmark objects for positional form checks (unchanged)
                 landmark_left_shoulder: ls,
                 landmark_right_shoulder: rs,
                 landmark_left_elbow: lElbow,
                 landmark_right_elbow: rElbow,
                 landmark_left_hip: lh,
                 landmark_right_hip: rh,
-                trunk_angle_left: trunkAngleLeft,
-                trunk_angle_right: trunkAngleRight,
+                trunk_angle_left: smoothTrunkLeft,
+                trunk_angle_right: smoothTrunkRight,
             });
 
             // DRAW FULL BODY LANDMARKS

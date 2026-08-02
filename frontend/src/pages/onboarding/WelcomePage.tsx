@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/uiStore';
-import { authService } from '@/lib/api';
+import { authService, biometricService } from '@/lib/api';
+import { useOnboardingStore } from '@/store/onboardingStore';
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address."),
@@ -32,7 +33,7 @@ export function WelcomePage() {
   const navigate = useNavigate();
   const { setAuth } = useAuth();
   const { addToast } = useUIStore();
-  
+
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,12 +57,40 @@ export function WelcomePage() {
           username: data.email,
           password: data.password
         });
-        
+
         setAuth(response.user, response.access);
         addToast({ title: "Welcome back!", description: "Successfully logged in.", type: "success" });
-        
-        // Go to dashboard by default as per user request
-        navigate('/dashboard');
+
+        // Device Agnostic Resume: If incomplete, fetch profile and rehydrate store
+        if (response.user.onboardingComplete === false) {
+          try {
+            const profile = await biometricService.getProfile();
+            if (profile) {
+              const store = useOnboardingStore.getState();
+              if (profile.age_group) store.setField('ageGroup', profile.age_group);
+              if (profile.sex) store.setField('sex', profile.sex);
+              if (profile.height) store.setField('height', profile.height.toString());
+              if (profile.weight) store.setField('weight', profile.weight.toString());
+              if (profile.bmi) store.setField('bmi', profile.bmi.toString());
+
+              if (profile.goal === 'assessment_init') {
+                store.setField('photoTaken', true);
+                store.setField('cameraAllowed', true);
+              } else if (profile.goal && profile.goal !== 'assessment_init') {
+                store.setField('photoTaken', true);
+                store.setField('cameraAllowed', true);
+                store.setField('selectedGoal', profile.goal);
+              }
+            }
+          } catch (e) {
+            console.error("Failed to sync profile:", e);
+          }
+          // The ProtectedRoute will now correctly bounce them to exactly where they left off
+          navigate('/onboarding/physiological-profile');
+        } else {
+          // Go to dashboard by default as per user request
+          navigate('/dashboard');
+        }
       } else {
         await authService.register({
           username: data.email,
@@ -84,9 +113,9 @@ export function WelcomePage() {
     } catch (error: any) {
       let errorMessage = "Something went wrong. Please try again.";
       let hasFieldErrors = false;
-      
+
       console.error("Auth error:", error);
-      
+
       // Handle network errors
       if (!error.response) {
         errorMessage = error.message || "Network error. Please check your connection and try again.";
@@ -103,7 +132,7 @@ export function WelcomePage() {
         hasFieldErrors = true;
       } else if (error.response?.status === 400) {
         const errorData = error.response.data;
-        
+
         if (typeof errorData === 'object') {
           // Handle specific field validation errors
           if (errorData.email) {
@@ -113,7 +142,7 @@ export function WelcomePage() {
             });
             hasFieldErrors = true;
           }
-          
+
           if (errorData.username) {
             form.setError('email', {
               type: 'manual',
@@ -121,7 +150,7 @@ export function WelcomePage() {
             });
             hasFieldErrors = true;
           }
-          
+
           if (errorData.password) {
             form.setError('password', {
               type: 'manual',
@@ -148,7 +177,7 @@ export function WelcomePage() {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       // Only show toast if there are no field-specific errors to display
       if (!hasFieldErrors) {
         addToast({ title: "Error", description: errorMessage, type: "error" });
@@ -165,106 +194,104 @@ export function WelcomePage() {
   ];
 
   return (
-  <div className="h-screen w-full flex items-center justify-center relative overflow-hidden bg-[var(--bg-dashboard)] p-6">
-    
-    {/* LOGO IN TOP LEFT CORNER */}
-    <div className="absolute top-4 left-6 lg:top-10 lg:left-12">
-      <h1 className="text-3xl font-bold text-[var(--primary-solid)] tracking-wider">AECS</h1>
-    </div>
+    <div className="h-screen w-full flex items-center justify-center relative overflow-hidden bg-[var(--bg-dashboard)] p-6">
 
-    {/* CENTERED AUTH CARD */}
-    <div className="w-full max-w-md space-y-6">
-      
-      <div className='text-center'>
+      {/* LOGO IN TOP LEFT CORNER */}
+      <div className="absolute top-4 left-6 lg:top-10 lg:left-12">
+        <h1 className="text-3xl font-bold text-[var(--primary-solid)] tracking-wider">AECS</h1>
+      </div>
+
+      {/* CENTERED AUTH CARD */}
+      <div className="w-full max-w-md space-y-6">
+
+        <div className='text-center'>
           <h2 className="text-2xl font-bold text-[var(--text-main)]">{isLogin ? 'Welcome back' : 'Create account'}</h2>
         </div>
 
-      {/* Main Form Card */}
-      <div className="p-8 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl shadow-sm space-y-6">
-        {/* Tab Switcher */}
-      <div className="flex p-1 bg-[var(--accent-surface)] rounded-xl">
-        <button
-          onClick={() => setAuthMode('login')}
-          className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${
-            isLogin 
-              ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm' 
-              : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          Login
-        </button>
-        <button
-          onClick={() => setAuthMode('signup')}
-          className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${
-            !isLogin 
-              ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm' 
-              : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          Signup
-        </button>
-      </div>
-        
+        {/* Main Form Card */}
+        <div className="p-8 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-2xl shadow-sm space-y-6">
+          {/* Tab Switcher */}
+          <div className="flex p-1 bg-[var(--accent-surface)] rounded-xl">
+            <button
+              onClick={() => setAuthMode('login')}
+              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${isLogin
+                  ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+            >
+              Login
+            </button>
+            <button
+              onClick={() => setAuthMode('signup')}
+              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${!isLogin
+                  ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+            >
+              Signup
+            </button>
+          </div>
 
-        <form onSubmit={form.handleSubmit(handleSubmit as any)} className="space-y-5">
-          
-          {/* FULL NAME FIELD (SIGNUP ONLY) */}
-          {!isLogin && (
+
+          <form onSubmit={form.handleSubmit(handleSubmit as any)} className="space-y-5">
+
+            {/* FULL NAME FIELD (SIGNUP ONLY) */}
+            {!isLogin && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Full Name</label>
+                <Input
+                  {...form.register("fullName")}
+                  placeholder="e.g. John Doe"
+                  leftIcon={<User size={18} className="text-[var(--text-muted)]" />}
+                  error={form.formState.errors.fullName?.message}
+                />
+              </div>
+            )}
+
+            {/* EMAIL FIELD */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Full Name</label>
+              <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Email Address</label>
               <Input
-                {...form.register("fullName")}
-                placeholder="e.g. John Doe"
-                leftIcon={<User size={18} className="text-[var(--text-muted)]" />}
-                error={form.formState.errors.fullName?.message}
+                {...form.register("email")}
+                placeholder="e.g. john@example.com"
+                leftIcon={<Mail size={18} className="text-[var(--text-muted)]" />}
+                error={form.formState.errors.email?.message}
               />
             </div>
-          )}
 
-          {/* EMAIL FIELD */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Email Address</label>
-            <Input
-              {...form.register("email")}
-              placeholder="e.g. john@example.com"
-              leftIcon={<Mail size={18} className="text-[var(--text-muted)]" />}
-              error={form.formState.errors.email?.message}
-            />
-          </div>
-
-          {/* PASSWORD FIELD */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Password</label>
-            <div className="relative">
-              <Input
-                {...form.register("password")}
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                leftIcon={<Lock size={18} className="text-[var(--text-muted)]" />}
-                error={form.formState.errors.password?.message}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+            {/* PASSWORD FIELD */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Password</label>
+              <div className="relative">
+                <Input
+                  {...form.register("password")}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  leftIcon={<Lock size={18} className="text-[var(--text-muted)]" />}
+                  error={form.formState.errors.password?.message}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* SUBMIT BUTTON */}
-          <button 
-            type="submit" 
-            className="w-full h-12 mt-2 rounded-xl text-white font-semibold flex items-center justify-center transition-colors bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] disabled:opacity-70"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Loading...' : (isLogin ? 'Login' : 'Get Started')}
-          </button>
-        </form>
+            {/* SUBMIT BUTTON */}
+            <button
+              type="submit"
+              className="w-full h-12 mt-2 rounded-xl text-white font-semibold flex items-center justify-center transition-colors bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] disabled:opacity-70"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Loading...' : (isLogin ? 'Login' : 'Get Started')}
+            </button>
+          </form>
+        </div>
+
       </div>
-
     </div>
-  </div>
-);
+  );
 }

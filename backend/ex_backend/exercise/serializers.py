@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import Exercise, WorkoutSession, ExerciseLog
+from .algorithms.scoring import calculate_form_score
+from .algorithms.angle import calculate_angle  # noqa: F401  (imported for re-export / tests)
 
 
 class ExerciseSerializer(serializers.ModelSerializer):
@@ -76,6 +78,15 @@ class SessionSummarySerializer(serializers.Serializer):
     reps_right = serializers.IntegerField(min_value=0, required=False, default=0)
     # Optional goal context for richer session metadata
     goal_context = serializers.CharField(required=False, default='', allow_blank=True)
+    # Algorithm 3: per-frame smoothed angle readings for form score calculation.
+    # The frontend appends the EMA-smoothed joint angle each frame and sends the
+    # full list at session end. Backend calls calculate_form_score() on this list.
+    angle_readings = serializers.ListField(
+        child=serializers.FloatField(),
+        required=False,
+        default=list,
+        help_text='EMA-smoothed joint angles recorded per frame during the set'
+    )
 
     def create(self, validated_data):
         user = self.context['request'].user
@@ -91,6 +102,24 @@ class SessionSummarySerializer(serializers.Serializer):
             meta['reps_right'] = validated_data.get('reps_right', 0)
         if validated_data.get('goal_context'):
             meta['goal_context'] = validated_data['goal_context']
+
+        # Algorithm 3: Form Score Calculation.
+        # The ideal range comes from the exercise's angle_ranges for the user's
+        # age band. We use 'bottom_min'/'bottom_max' as the ideal squat depth,
+        # or 'peak_min'/'peak_max' for curl exercises.
+        angle_readings = validated_data.get('angle_readings', [])
+        if angle_readings:
+            # Attempt to resolve ideal range from the exercise's angle_ranges.
+            # Fall back to sensible defaults if the exercise has no calibrated range.
+            angle_ranges = exercise.angle_ranges or {}
+            # Try to find any configured band; use first available or safe default.
+            first_band = next(iter(angle_ranges), None)
+            band_cfg = angle_ranges.get(first_band, {}) if first_band else {}
+            ideal_min = float(band_cfg.get('bottom_min', band_cfg.get('peak_min', 60)))
+            ideal_max = float(band_cfg.get('bottom_max', band_cfg.get('peak_max', 90)))
+            form_score = calculate_form_score(angle_readings, ideal_min, ideal_max)
+            meta['form_score'] = form_score
+            meta['angle_readings_count'] = len(angle_readings)
 
         session = WorkoutSession.objects.create(
             user=user,

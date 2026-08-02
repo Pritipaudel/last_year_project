@@ -6,23 +6,29 @@ import { Input } from '@/components/ui/Input';
 import { PageTransition } from '@/components/common/PageTransition';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { biometricService } from '@/lib/api';
+import { authService } from '@/lib/api';
 import { useUIStore } from '@/store/uiStore';
 
 export function PhysiologicalProfilePage() {
   const navigate = useNavigate();
-  const { setFields } = useOnboardingStore();
+  const { setFields, ageGroup, sex, height, weight } = useOnboardingStore();
   const { addToast } = useUIStore();
-  const [step, setStep] = useState(1);
-  const [isSaving, setIsSaving] = useState(false);
+
   const [formData, setFormData] = useState({
-    ageGroup: '',
-    sex: '',
-    height: '',
-    weight: '',
+    ageGroup: ageGroup || '',
+    sex: sex || '',
+    height: height || '',
+    weight: weight || '',
   });
 
+  // Calculate the starting step based on the persisted data
+  const initialStep = (height && weight) ? 3 : sex ? 3 : ageGroup ? 2 : 1;
+  const [step, setStep] = useState(initialStep);
+  const [isSaving, setIsSaving] = useState(false);
+
+
   const ageGroups = [
-// ... (omitted same content for brevity in instruction, but will include in replacement)
+    // ... (omitted same content for brevity in instruction, but will include in replacement)
     { value: '18-25', label: '18-25', icon: GraduationCap },
     { value: '26-40', label: '26-40', icon: Briefcase },
     { value: '41-60', label: '41-60', icon: User },
@@ -53,7 +59,7 @@ export function PhysiologicalProfilePage() {
       setIsSaving(true);
       try {
         const bmi = calculateBMI();
-        
+
         // Persist to backend
         await biometricService.saveProfile({
           age_group: formData.ageGroup,
@@ -97,20 +103,27 @@ export function PhysiologicalProfilePage() {
     <PageTransition variant="fade" className="flex flex-col max-h-screen bg-[var(--bg-dashboard)]">
       <div className="px-4 py-8 max-w-md mx-auto w-full flex-1 flex flex-col">
         {/* Header & Progress */}
-        <div className="mb-8">
-          <button 
-          onClick={() => (step > 1 ? setStep(step - 1) : navigate(-1))} 
-          className="flex items-center gap-2 text-sm font-semibold text-[var(--accent-text)] hover:text-[var(--primary-hover)] transition-colors w-fit mb-6"
-        >
-          <ArrowLeft size={16} strokeWidth={2.5} />
-          <span>Back</span>
-        </button>
+        <div className="mb-8 flex justify-between items-start">
+          <button
+            onClick={() => {
+              if (step > 1) {
+                setStep(step - 1);
+              } else {
+                authService.logout();
+                navigate('/welcome');
+              }
+            }}
+            className="flex items-center gap-2 text-sm font-semibold text-[var(--accent-text)] hover:text-[var(--primary-hover)] transition-colors w-fit mb-6"
+          >
+            <ArrowLeft size={16} strokeWidth={2.5} />
+            <span>{step === 1 ? 'Save & Logout' : 'Back'}</span>
+          </button>
 
           <p className="text-sm mb-3 text-center font-medium text-[var(--text-muted)]">
             Step {step} of 3
           </p>
           <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full transition-all duration-300 ease-out rounded-full"
               style={{ width: `${(step / 3) * 100}%`, background: 'var(--primary-solid)' }}
             />
@@ -139,11 +152,11 @@ export function PhysiologicalProfilePage() {
                       onClick={() => setFormData({ ...formData, ageGroup: group.value })}
                       className="h-32 rounded-xl flex flex-col items-center justify-center gap-3 transition-all border-2"
                       style={{
-                      borderColor: isSelected ? 'var(--accent-text)' : 'var(--text-muted)',
-                      background: isSelected ? 'var(--accent-surface)' : 'var(--bg-card)',
-                      boxShadow: isSelected ? 'none' : '0 1px 3px rgba(0,0,0,0.02)',
-                      transform: isSelected ? 'scale(0.98)' : 'scale(1)',
-                    }}
+                        borderColor: isSelected ? 'var(--accent-text)' : 'var(--text-muted)',
+                        background: isSelected ? 'var(--accent-surface)' : 'var(--bg-card)',
+                        boxShadow: isSelected ? 'none' : '0 1px 3px rgba(0,0,0,0.02)',
+                        transform: isSelected ? 'scale(0.98)' : 'scale(1)',
+                      }}
                     >
                       <Icon size={32} strokeWidth={2} />
                       <span className="font-semibold">{group.label}</span>
@@ -226,7 +239,7 @@ export function PhysiologicalProfilePage() {
                 </div>
 
                 {/* Live BMI Display */}
-                <div 
+                <div
                   className="p-5 rounded-xl border-2 transition-all duration-300"
                   style={{
                     borderColor: bmi ? 'rgba(70, 130, 180, 0.4)' : '#E2E8F0',
@@ -240,10 +253,10 @@ export function PhysiologicalProfilePage() {
                   </p>
                   {bmi ? (
                     <div className="flex items-end gap-2">
-                       <p className="text-3xl font-bold" style={{ color: '#4682B4' }}>{bmi}</p>
-                       <span className="text-sm pb-1 font-medium tracking-wide" style={{ color: 'rgba(70, 130, 180, 0.8)' }}>
+                      <p className="text-3xl font-bold" style={{ color: '#4682B4' }}>{bmi}</p>
+                      <span className="text-sm pb-1 font-medium tracking-wide" style={{ color: 'rgba(70, 130, 180, 0.8)' }}>
                         {parseFloat(bmi) < 18.5 ? 'UNDERWEIGHT' : parseFloat(bmi) < 25 ? 'HEALTHY RANGE' : parseFloat(bmi) < 30 ? 'OVERWEIGHT' : 'OBESE'}
-                       </span>
+                      </span>
                     </div>
                   ) : (
                     <p className="text-2xl font-bold text-muted-foreground">--.-</p>
@@ -266,6 +279,6 @@ export function PhysiologicalProfilePage() {
           </Button>
         </div>
       </div>
-    </PageTransition>
+    </PageTransition >
   );
 }

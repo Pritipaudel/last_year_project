@@ -13,6 +13,7 @@ logic.
 """
 
 from .models import Exercise
+from .algorithms.recommendation import rank_exercises_by_suitability
 
 
 # Maps BiometricProfile.goal values → goal_tags stored on exercises.
@@ -289,11 +290,20 @@ def get_personalized_exercises(user) -> list[dict]:
     band = _safe_band(profile) if profile else '26-40'
     goal_tag = _resolve_goal_tag(profile.goal if profile else None)
 
-    # __contains on a JSONField does a PostgreSQL @> containment check.
-    # This correctly matches ["weight_loss", "general"] when filtering for "weight_loss".
-    exercises = Exercise.objects.filter(goal_tags__contains=[goal_tag])
+    # Algorithm 4: Weighted Multi-Criteria Scoring and Ranking.
+    # Fetch ALL exercises from the database (no pre-filter).
+    # rank_exercises_by_suitability() scores each exercise on four weighted criteria
+    # (age band match, goal match, BMI suitability, difficulty appropriateness)
+    # and returns them sorted descending by score using insertion sort.
+    # Only exercises with score > 0 are returned to the frontend.
+    all_exercises = list(Exercise.objects.all())
+    ranked = rank_exercises_by_suitability(all_exercises, profile)
 
-    return [_personalize(user, ex, band, goal_tag) for ex in exercises]
+    result = []
+    for item in ranked:
+        if item['score'] > 0:
+            result.append(_personalize(user, item['exercise'], band, goal_tag))
+    return result
 
 
 def get_personalized_exercise_detail(user, exercise_id: int) -> dict | None:

@@ -14,9 +14,11 @@ import { createButterflyTracker } from "@/lib/butterfly_tracking";
 // VISIBILITY HELPERS
 // ================================================================
 
-/** Squat: requires BOTH hips AND BOTH knees clearly visible (all 4 landmarks). */
 function isUpperLegVisible(landmarks: any[]): boolean {
-  return [23, 24, 25, 26].every(idx => landmarks[idx] && landmarks[idx].visibility > 0.5);
+  if (!landmarks) return false;
+  const leftVis = landmarks[23]?.visibility > 0.5 && landmarks[25]?.visibility > 0.5;
+  const rightVis = landmarks[24]?.visibility > 0.5 && landmarks[26]?.visibility > 0.5;
+  return leftVis || rightVis;
 }
 
 /** Both exercises: person is at least partially in frame. */
@@ -102,6 +104,11 @@ export function ActiveWorkoutPage() {
   const consecutiveLostFrames = useRef(0);
   const LOST_THRESHOLD = 25;
   const lastUiUpdateAt = useRef(0);
+
+  // Algorithm 3: collect EMA-smoothed angle readings per frame during a set.
+  // Appended each frame in the processPose callback; sent to backend on session end.
+  // Backend calls calculate_form_score(angle_readings, ideal_min, ideal_max).
+  const angleReadingsRef = useRef<number[]>([]);
 
   // Refs so tracking callback always reads fresh values
   const isPausedRef = useRef(false);
@@ -233,7 +240,7 @@ export function ActiveWorkoutPage() {
       if (isStatic) {
         const isButterfly = ex.name.toLowerCase().includes('butterfly') || ex.name.toLowerCase().includes('baddha');
         let result: any;
-        
+
         if (isButterfly && butterflyTrackerRef.current) {
           result = butterflyTrackerRef.current.processFrame(landmarks, Date.now());
         } else if (!isButterfly && treeTrackerRef.current) {
@@ -271,8 +278,8 @@ export function ActiveWorkoutPage() {
             result.activeLeg === 'left'
               ? result.leftLeg.isHolding
               : result.activeLeg === 'right'
-              ? result.rightLeg.isHolding
-              : false,
+                ? result.rightLeg.isHolding
+                : false,
           );
           lastUiUpdateAt.current = now;
         }
@@ -363,10 +370,10 @@ export function ActiveWorkoutPage() {
 
       if (angle === null) return;
       const standingAngle = calibratedStandingAngle.current!;
-      const descendTrigger = standingAngle - 12;
-      const completeTrigger = standingAngle - 12;
+      const descendTrigger = standingAngle - 15;
+      const completeTrigger = standingAngle - 15;
       const resetTrigger = standingAngle - 6;
-      const bottomMax = Math.max((thresholds as any).bottom_max ?? 90, standingAngle - 60);
+      const bottomMax = (thresholds as any).bottom_max ?? 90;
 
       if (repState.current === 'ready') {
         if (angle < descendTrigger) {
@@ -380,20 +387,26 @@ export function ActiveWorkoutPage() {
           repState.current = 'bottom';
           reachedBottom.current = true;
           speakImmediate("Good depth!");
-        } else if (angle > minAngleInRep.current + 15) {
+        } else if (angle > minAngleInRep.current + 30) {
           repState.current = 'ascending';
         }
       } else if (repState.current === 'bottom') {
         if (angle < minAngleInRep.current) minAngleInRep.current = angle;
-        if (angle > minAngleInRep.current + 20) repState.current = 'ascending';
+        if (angle > minAngleInRep.current + 30) repState.current = 'ascending';
       } else if (repState.current === 'ascending') {
         if (angle > completeTrigger) {
           if (reachedBottom.current) {
-            setReps(r => r + 1);
-            repState.current = 'waiting_for_top';
-            speakImmediate("Nice work!");
+            if (spineAngle !== null && spineAngle > 25) {
+              speakImmediate((cues as any).forward_lean ?? "No rep! Keep your chest up.");
+              repState.current = 'waiting_for_top';
+            } else {
+              setReps(r => r + 1);
+              repState.current = 'waiting_for_top';
+              speakImmediate("Nice work!");
+            }
           } else {
-            repState.current = 'ready';
+            speakImmediate((cues as any).insufficient_depth ?? "Not deep enough.");
+            repState.current = 'waiting_for_top';
           }
         }
       } else if (repState.current === 'waiting_for_top') {
@@ -402,6 +415,15 @@ export function ActiveWorkoutPage() {
 
       if (spineAngle !== null && spineAngle < 55) {
         speak((cues as any).forward_lean || 'Keep your chest up.', 'spine', 8000);
+      }
+
+      // Algorithm 3: append the primary joint angle for this exercise to the
+      // angle_readings buffer. For squats this is the knee angle (rep depth);
+      // for curls the elbow angle is already collected via the curl tracker.
+      // The buffer is sent to the backend at session end for form score calculation.
+      const primaryAngle = angle ?? spineAngle;
+      if (primaryAngle !== null) {
+        angleReadingsRef.current.push(primaryAngle);
       }
     });
 
@@ -467,6 +489,9 @@ export function ActiveWorkoutPage() {
         reps_completed: reps,
         duration_seconds: seconds,
         form_errors: formErrors as any,
+        // Algorithm 3: send collected angle readings for form score calculation.
+        // Backend will call calculate_form_score() and store result in session metadata.
+        angle_readings: angleReadingsRef.current,
         ...(isCurl && tracker ? {
           reps_left: tracker.getCounts().left,
           reps_right: tracker.getCounts().right,
@@ -503,10 +528,9 @@ export function ActiveWorkoutPage() {
               {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
             </Button>
             <div className="flex flex-col">
-              <span className={`text-[8px] uppercase font-black tracking-[0.2em] ${
-                trackingStatus === 'tracking' ? 'text-green-400' :
+              <span className={`text-[8px] uppercase font-black tracking-[0.2em] ${trackingStatus === 'tracking' ? 'text-green-400' :
                 trackingStatus === 'lost' ? 'text-red-400' : 'text-white/40'
-              }`}>
+                }`}>
                 {trackingStatus === 'tracking' ? 'TRACKING' : trackingStatus === 'lost' ? 'LOST VIEW' : 'CALIBRATING'}
               </span>
               <span className="font-black text-xs uppercase italic tracking-wider">{exercise?.name}</span>

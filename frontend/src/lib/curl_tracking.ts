@@ -61,6 +61,7 @@ interface ArmTracker {
     peakFrameCount: number;
     peakReached: boolean;
     curlAttempted: boolean;         // true once arm bends 35°+ — prevents flinch noise
+    invalidRep: boolean;
     prevState: ArmState;            // track transitions for incomplete_extension detection
     restingElbowX: number | null;
     restingShoulderY: number | null;
@@ -141,6 +142,7 @@ export function createCurlTracker(
                 arm.peakFrameCount = 0;
                 arm.peakReached = false;
                 arm.curlAttempted = false;
+                arm.invalidRep = false;
                 trunkSwingWarned = false;
                 trunkAngleAtRepStart = null;
             }
@@ -168,6 +170,7 @@ export function createCurlTracker(
                 arm.peakFrameCount = 0;
                 arm.peakReached = false;
                 arm.curlAttempted = false;
+                arm.invalidRep = false;
             }
         }
 
@@ -187,10 +190,13 @@ export function createCurlTracker(
             if (elbowAngle > t.extended_threshold - 10) {
                 // Fully extended — rep cycle complete
                 if (arm.peakReached) {
-                    arm.reps += 1;
-                    // Single shared praise key prevents both arms double-speaking
-                    const praises = ['Perfect!', 'Great curl!', 'Nice work!', 'Keep it up!', 'Excellent!'];
-                    speak(praises[arm.reps % praises.length]!, 'curl_praise', 3500);
+                    if (arm.invalidRep) {
+                        speak("Form broken, no rep.", "curl_invalid", 3000);
+                    } else {
+                        arm.reps += 1;
+                        const praises = ['Perfect!', 'Great curl!', 'Nice work!', 'Keep it up!', 'Excellent!'];
+                        speak(praises[arm.reps % praises.length]!, 'curl_praise', 3500);
+                    }
                 } else if (arm.curlAttempted) {
                     // They tried a real curl but didn't hold the peak long enough
                     fireError('insufficient_curl', cues.insufficient_curl, side);
@@ -199,6 +205,7 @@ export function createCurlTracker(
                 arm.peakFrameCount = 0;
                 arm.peakReached = false;
                 arm.curlAttempted = false;
+                arm.invalidRep = false;
                 trunkAngleAtRepStart = null;
             } else if (elbowAngle < t.peak_max) {
                 // Arm went back INTO peak zone before fully extending — incomplete extension
@@ -247,6 +254,8 @@ export function createCurlTracker(
         if (delta > 15 && !trunkSwingWarned) {
             fireError('body_swing', cues.body_swing, 'both');
             trunkSwingWarned = true;
+            left.invalidRep = true;
+            right.invalidRep = true;
         }
     }
 
@@ -262,6 +271,7 @@ export function createCurlTracker(
         const drift = Math.abs(elbowX - arm.restingElbowX);
         if (drift > 0.12) {
             fireError('elbow_swing', cues.elbow_swing, side);
+            arm.invalidRep = true;
         }
     }
 
@@ -278,6 +288,7 @@ export function createCurlTracker(
         const rise = arm.restingShoulderY - shoulderY;
         if (rise > 0.08) {
             fireError('shoulder_elevation', cues.shoulder_elevation, side);
+            arm.invalidRep = true;
         }
     }
 
@@ -299,6 +310,7 @@ export function createCurlTracker(
             peakFrameCount: 0,
             peakReached: false,
             curlAttempted: false,
+            invalidRep: false,
             restingElbowX: null,
             restingShoulderY: null,
             calibrated: false,

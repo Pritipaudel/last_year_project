@@ -58,7 +58,12 @@ export const authService = {
 };
 
 export const biometricService = {
+    getProfile: async () => {
+        const { data } = await api.get('biometrics/profile/');
+        return data;
+    },
     saveProfile: (profileData: any) => api.patch('biometrics/profile/', profileData),
+    deleteProfile: () => api.delete('biometrics/profile/'),
     submitAssessment: (assessmentData: any) => {
         // If data is FormData (for image uploads), axial headers are handled automatically
         return api.post('biometrics/assess/', assessmentData);

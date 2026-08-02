@@ -40,6 +40,8 @@ EXERCISES = [
         # Relevant for all three goals — squats burn calories (weight_loss),
         # build muscle (weight_gain), and suit general fitness programmes.
         "goal_tags": ["weight_loss", "weight_gain", "general", "stay_active"],
+        "age_groups_allowed": ["18-25", "26-40", "41-60", "60+"],
+        "high_impact": False,
 
         # MediaPipe interior knee angle (Hip→Knee→Ankle).
         # standing_threshold: below this = "descending" state begins.
@@ -153,6 +155,8 @@ EXERCISES = [
         # goal_tags: ["weight_gain", "weight_loss", "stay_active", "general"]
         # (Included general so it acts as a fallback for incomplete profiles)
         "goal_tags": ["weight_gain", "weight_loss", "stay_active", "general"],
+        "age_groups_allowed": ["18-25", "26-40", "41-60", "60+"],
+        "high_impact": False,
 
         # Elbow angle ranges for rep counting.
         # Reminder: small angle = fully curled; large angle = arm extended.
@@ -324,6 +328,8 @@ EXERCISES = [
 
         # Flexibility goal only — Tree Pose is not a strength or cardio exercise.
         "goal_tags": ["flexibility"],
+        "age_groups_allowed": ["18-25", "26-40", "41-60", "60+"],
+        "high_impact": False,
 
         # Alignment thresholds — NOT traditional joint angle ranges.
         # All proportional values use MediaPipe's normalized 0.0–1.0 coordinate system.
@@ -492,6 +498,8 @@ EXERCISES = [
             "duration without forcing deeper range."
         ),
         "goal_tags": ["flexibility"],
+        "age_groups_allowed": ["18-25", "26-40", "41-60", "60+"],
+        "high_impact": False,
 
         # angle_ranges repurposed as alignment_thresholds for seated pose.
         # knee_drop_ratio: (knee_y - hip_y) / torso_height — positive means knees dropped.
