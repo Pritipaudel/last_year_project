@@ -55,7 +55,8 @@ export function DoctorSearchPage() {
           placeholder="Search doctors or specialties..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          leftIcon={<Search className="h-4 w-4" />}
+          leftIcon={<Search className="h-4 w-4 " />}
+          className="bg-[var(--primary-light)]/20 border-[var(--primary-light)]/30 focus-visible:ring-[var(--primary-light)]/70"
         />
 
         {/* Category Tabs */}
@@ -66,8 +67,8 @@ export function DoctorSearchPage() {
               onClick={() => setSelectedSpecialty(spec)}
               className={`px-4 py-2 rounded-full text-xs font-semibold border whitespace-nowrap transition-all duration-150 ${
                 selectedSpecialty === spec
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card border-border hover:border-primary/50 text-foreground"
+                  ? "bg-[var(--primary-solid)] text-primary-foreground border-primary"
+                  : "bg-card border-border hover:border-[var(--primary-solid)]/50 text--var(--text-main)"
               }`}
             >
               {spec}
@@ -164,7 +165,7 @@ export function DoctorSearchPage() {
             ))}
 
             {doctors.length === 0 && (
-              <div className="py-12 text-center text-muted-foreground">
+              <div className="py-12 text-center text-[var(--text-muted)]">
                 No specialists found matching your search.
               </div>
             )}

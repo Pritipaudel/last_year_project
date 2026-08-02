@@ -32,11 +32,11 @@ export function CameraPermissionPage() {
           <div
             className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto"
             style={{
-              background: "linear-gradient(135deg, #DCEEFF 0%, #EBF4FF 100%)",
-              border: "2px solid #B8D8F8",
+              background: "linear-gradient(135deg, #e4ffdc 0%, #b4ddbe 100%)",
+              border: "2px solid #b8f8c6",
             }}
           >
-            <Camera size={40} strokeWidth={1.8} style={{ color: "#4682B4" }} />
+            <Camera size={40} strokeWidth={1.8} style={{ color: "#25854a" }} />
           </div>
         </motion.div>
 
@@ -45,7 +45,7 @@ export function CameraPermissionPage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="text-2xl font-bold mb-3 text-foreground"
+          className="text-2xl font-bold mb-3 text-[var(--text-main)]"
         >
           Camera Access
         </motion.h1>
@@ -55,7 +55,7 @@ export function CameraPermissionPage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="text-muted-foreground max-w-sm mb-8 leading-relaxed"
+          className="text-[var(--text-muted)] max-w-sm mb-8 leading-relaxed"
         >
           We use your camera to provide real-time exercise guidance. Your photos and videos are never uploaded to any server.
         </motion.p>
@@ -77,13 +77,13 @@ export function CameraPermissionPage() {
               <div
                 key={index}
                 className="flex items-start gap-4 p-4 rounded-xl border text-left"
-                style={{ background: "#FFFFFF", borderColor: "#E2E8F0" }}
+                style={{ background: "#FFFFFF", borderColor: "#e2f0e5" }}
               >
                 <div
                   className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: "#EBF4FF" }}
+                  style={{ background: "#ebffec" }}
                 >
-                  <Icon size={18} style={{ color: "#4682B4" }} />
+                  <Icon size={18} style={{ color: "#46b44f" }} />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">{item.title}</p>
@@ -104,6 +104,12 @@ export function CameraPermissionPage() {
         >
           Allow Camera
         </Button>
+        <button
+          onClick={handleSkip}
+          className="w-full text-center py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Maybe Later
+        </button>
       </div>
     </PageTransition>
   );
