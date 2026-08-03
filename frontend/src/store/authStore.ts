@@ -27,7 +27,14 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
       setUser: (user) => set({ user }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      logout: () => {
+        localStorage.removeItem('token');
+        // Clear onboarding store to avoid stale data on next login
+        try {
+          localStorage.removeItem('aecs-onboarding-storage');
+        } catch (_) { }
+        set({ user: null, token: null, isAuthenticated: false });
+      },
     }),
     {
       name: "aecs-auth-storage",

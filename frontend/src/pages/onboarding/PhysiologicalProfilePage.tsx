@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/Input';
 import { PageTransition } from '@/components/common/PageTransition';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { biometricService } from '@/lib/api';
-import { authService } from '@/lib/api';
 import { useUIStore } from '@/store/uiStore';
 
 export function PhysiologicalProfilePage() {
@@ -52,8 +51,12 @@ export function PhysiologicalProfilePage() {
 
   const handleContinue = async () => {
     if (step === 1 && formData.ageGroup) {
+      // Persist step 1 selection immediately so it survives remounts
+      setFields({ ageGroup: formData.ageGroup });
       setStep(2);
     } else if (step === 2 && formData.sex) {
+      // Persist step 2 selection immediately
+      setFields({ sex: formData.sex });
       setStep(3);
     } else if (step === 3 && formData.height && formData.weight) {
       setIsSaving(true);
@@ -104,20 +107,15 @@ export function PhysiologicalProfilePage() {
       <div className="px-4 py-8 max-w-md mx-auto w-full flex-1 flex flex-col">
         {/* Header & Progress */}
         <div className="mb-8 flex justify-between items-start">
-          <button
-            onClick={() => {
-              if (step > 1) {
-                setStep(step - 1);
-              } else {
-                authService.logout();
-                navigate('/welcome');
-              }
-            }}
-            className="flex items-center gap-2 text-sm font-semibold text-[var(--accent-text)] hover:text-[var(--primary-hover)] transition-colors w-fit mb-6"
-          >
-            <ArrowLeft size={16} strokeWidth={2.5} />
-            <span>{step === 1 ? 'Save & Logout' : 'Back'}</span>
-          </button>
+          {step > 1 && (
+            <button
+              onClick={() => setStep(step - 1)}
+              className="flex items-center gap-2 text-sm font-semibold text-[var(--accent-text)] hover:text-[var(--primary-hover)] transition-colors w-fit mb-6"
+            >
+              <ArrowLeft size={16} strokeWidth={2.5} />
+              <span>Back</span>
+            </button>
+          )}
 
           <p className="text-sm mb-3 text-center font-medium text-[var(--text-muted)]">
             Step {step} of 3

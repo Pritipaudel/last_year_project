@@ -5,6 +5,7 @@ from rest_framework.validators import UniqueValidator
 from .validators import PasswordStrengthValidator
 
 
+
 class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
         required=True,

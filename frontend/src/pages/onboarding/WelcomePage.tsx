@@ -61,12 +61,15 @@ export function WelcomePage() {
         setAuth(response.user, response.access);
         addToast({ title: "Welcome back!", description: "Successfully logged in.", type: "success" });
 
-        // Device Agnostic Resume: If incomplete, fetch profile and rehydrate store
+        // Device Agnostic Resume: always reset store first to avoid stale data
+        const store = useOnboardingStore.getState();
+        store.reset();
+
         if (response.user.onboardingComplete === false) {
+          // Fetch profile from backend to know where they left off
           try {
             const profile = await biometricService.getProfile();
             if (profile) {
-              const store = useOnboardingStore.getState();
               if (profile.age_group) store.setField('ageGroup', profile.age_group);
               if (profile.sex) store.setField('sex', profile.sex);
               if (profile.height) store.setField('height', profile.height.toString());
@@ -85,10 +88,9 @@ export function WelcomePage() {
           } catch (e) {
             console.error("Failed to sync profile:", e);
           }
-          // The ProtectedRoute will now correctly bounce them to exactly where they left off
+          // ProtectedRoute will now correctly bounce them to exactly where they left off
           navigate('/onboarding/physiological-profile');
         } else {
-          // Go to dashboard by default as per user request
           navigate('/dashboard');
         }
       } else {
@@ -107,6 +109,8 @@ export function WelcomePage() {
         });
 
         setAuth(loginResponse.user, loginResponse.access);
+        // Always start fresh for new signups
+        useOnboardingStore.getState().reset();
         addToast({ title: "Account created!", description: "Let's set up your profile.", type: "success" });
         navigate('/onboarding/physiological-profile');
       }
@@ -215,8 +219,8 @@ export function WelcomePage() {
             <button
               onClick={() => setAuthMode('login')}
               className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${isLogin
-                  ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                 }`}
             >
               Login
@@ -224,8 +228,8 @@ export function WelcomePage() {
             <button
               onClick={() => setAuthMode('signup')}
               className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${!isLogin
-                  ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                ? 'bg-[var(--bg-card)] text-[var(--primary-solid)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                 }`}
             >
               Signup

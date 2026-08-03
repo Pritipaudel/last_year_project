@@ -1,7 +1,7 @@
 import re
 from django.core.exceptions import ValidationError
 
-
+5
 class PasswordStrengthValidator:
     """
     Validates that the password meets high security standards:
