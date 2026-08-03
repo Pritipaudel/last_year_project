@@ -10,7 +10,7 @@ const api = axios.create({
 // Interceptor to attach JWT token to every request
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -24,7 +24,7 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            localStorage.removeItem('token');
+            sessionStorage.removeItem('token');
             // Only redirect on non-auth endpoints (avoid loop on login itself)
             if (!error.config?.url?.includes('auth/')) {
                 window.location.href = '/welcome';
@@ -42,7 +42,7 @@ export const authService = {
     login: async (credentials: any) => {
         const { data } = await api.post('auth/login/', credentials);
         if (data.access) {
-            localStorage.setItem('token', data.access);
+            sessionStorage.setItem('token', data.access);
         }
         // Map backend snake_case to frontend camelCase
         if (data.user) {
@@ -55,7 +55,7 @@ export const authService = {
         return data;
     },
     logout: () => {
-        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
     },
     getMe: () => api.get('auth/me/'),
 };
