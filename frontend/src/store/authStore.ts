@@ -31,13 +31,13 @@ export const useAuthStore = create<AuthState>()(
         sessionStorage.removeItem('token');
         // Clear onboarding store to avoid stale data on next login
         try {
-          sessionStorage.removeItem('aecs-onboarding-storage');
+          sessionStorage.removeItem('posefit-onboarding-storage');
         } catch (_) { }
         set({ user: null, token: null, isAuthenticated: false });
       },
     }),
     {
-      name: "aecs-auth-storage",
+      name: "posefit-auth-storage",
       storage: createJSONStorage(() => sessionStorage),
     }
   )

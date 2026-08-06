@@ -11,7 +11,7 @@ export function Sidebar() {
       <div className="flex h-16 items-center border-b px-6">
         <Link to="/dashboard" className="flex items-center gap-2 font-bold text-[var(--primary-hover)]/80 text-xl">
           <Activity className="h-6 w-6" />
-          <span>AECS</span>
+          <span>PoseFit</span>
         </Link>
       </div>
       

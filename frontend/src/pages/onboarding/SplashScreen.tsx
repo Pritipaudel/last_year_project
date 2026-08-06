@@ -117,7 +117,7 @@ export function SplashScreen() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="text-4xl font-bold tracking-tight text-white"
         >
-          AECS
+          PoseFit
         </motion.h1>
 
         {/* Tagline */}

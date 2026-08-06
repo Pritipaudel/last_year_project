@@ -1,6 +1,6 @@
-# AECS - Adaptive Exercise Coach System (Frontend)
+# PoseFit - Adaptive Exercise Coach System (Frontend)
 
-Welcome to the frontend repository for AECS (Adaptive Exercise Coach System). AECS is a medical-grade, highly personalized fitness tracker designed to build safe and effective exercise regimens catered uniquely to an individual's biomechanics, equipment availability, and personal goals.
+Welcome to the frontend repository for PoseFit (Adaptive Exercise Coach System). PoseFit is a medical-grade, highly personalized fitness tracker designed to build safe and effective exercise regimens catered uniquely to an individual's biomechanics, equipment availability, and personal goals.
 
 This project uses a modern web stack structured for high performance, smooth animations, and clean state management.
 
@@ -61,4 +61,4 @@ Ensure you have Node.js installed, then follow these steps:
 
 ## 🎨 Theme System
 
-AECS uses a custom CSS variable-backed design system mapped alongside Tailwind utilities. Core colors are located in `src/styles/theme.css`, configured out-of-the-box with our customized "Steel Blue" aesthetic ensuring clean contrast and high-end gradients.
+PoseFit uses a custom CSS variable-backed design system mapped alongside Tailwind utilities. Core colors are located in `src/styles/theme.css`, configured out-of-the-box with our customized "Steel Blue" aesthetic ensuring clean contrast and high-end gradients.

@@ -202,7 +202,7 @@ export function WelcomePage() {
 
       {/* LOGO IN TOP LEFT CORNER */}
       <div className="absolute top-4 left-6 lg:top-10 lg:left-12">
-        <h1 className="text-3xl font-bold text-[var(--primary-solid)] tracking-wider">AECS</h1>
+        <h1 className="text-3xl font-bold text-[var(--primary-solid)] tracking-wider">PoseFit</h1>
       </div>
 
       {/* CENTERED AUTH CARD */}

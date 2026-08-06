@@ -1,7 +1,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* AECS Design System Tokens */
+  /* PoseFit Design System Tokens */
 
   /* Font */
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -13,15 +13,15 @@
   --border-subtle: #E2E8F0;
 
   /* Colors - Semantic (Updated to Steel Blue Theme) */
-  --aecs-primary: #4682B4;
-  --aecs-primary-hover: #3A6F9A;
-  --aecs-primary-pressed: #2F5F8A;
-  --aecs-secondary: #5BA3D0;
-  --aecs-secondary-hover: #4A8DB8;
-  --aecs-warning: #F59E0B;
-  --aecs-warning-hover: #D97706;
-  --aecs-danger: #EF4444;
-  --aecs-danger-hover: #DC2626;
+  --posefit-primary: #4682B4;
+  --posefit-primary-hover: #3A6F9A;
+  --posefit-primary-pressed: #2F5F8A;
+  --posefit-secondary: #5BA3D0;
+  --posefit-secondary-hover: #4A8DB8;
+  --posefit-warning: #F59E0B;
+  --posefit-warning-hover: #D97706;
+  --posefit-danger: #EF4444;
+  --posefit-danger-hover: #DC2626;
 
   /* New Steel Blue Theme Colors */
   --steel-blue: #4682B4;
@@ -88,15 +88,15 @@
   --card-foreground: var(--text-primary);
   --popover: var(--surface-card);
   --popover-foreground: var(--text-primary);
-  --primary: var(--aecs-primary);
+  --primary: var(--posefit-primary);
   --primary-foreground: var(--text-inverse);
-  --secondary: var(--aecs-secondary);
+  --secondary: var(--posefit-secondary);
   --secondary-foreground: var(--text-inverse);
   --muted: #ececf0;
   --muted-foreground: var(--text-muted);
-  --accent: var(--aecs-primary);
+  --accent: var(--posefit-primary);
   --accent-foreground: var(--text-inverse);
-  --destructive: var(--aecs-danger);
+  --destructive: var(--posefit-danger);
   --destructive-foreground: var(--text-inverse);
   --border: var(--border-subtle);
   --input: transparent;
@@ -105,7 +105,7 @@
   --font-weight-medium: 600;
   --font-weight-normal: 400;
   --font-weight-bold: 700;
-  --ring: var(--aecs-primary);
+  --ring: var(--posefit-primary);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -114,12 +114,12 @@
   --radius: var(--radius-md);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: var(--aecs-primary);
+  --sidebar-primary: var(--posefit-primary);
   --sidebar-primary-foreground: var(--text-inverse);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: var(--border-subtle);
-  --sidebar-ring: var(--aecs-primary);
+  --sidebar-ring: var(--posefit-primary);
 }
 
 .dark {

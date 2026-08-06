@@ -38,7 +38,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       reset: () => set(initialState),
     }),
     {
-      name: "aecs-onboarding-storage",
+      name: "posefit-onboarding-storage",
     }
   )
 );

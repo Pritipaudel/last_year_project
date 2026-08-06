@@ -137,7 +137,7 @@ export function DoctorChatPage() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/10">
         <div className="text-center py-2 flex flex-col items-center">
           <span className="text-[10px] bg-card px-2.5 py-1 rounded-full border text-muted-foreground font-semibold flex items-center gap-1 shadow-sm">
-            <Sparkles className="h-3 w-3 text-primary animate-pulse" /> Secure AECS Consultation channel
+            <Sparkles className="h-3 w-3 text-primary animate-pulse" /> Secure PoseFit Consultation channel
           </span>
         </div>
 

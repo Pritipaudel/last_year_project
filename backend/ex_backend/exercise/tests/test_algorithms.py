@@ -14,7 +14,7 @@ import unittest
 
 from exercise.algorithms.angle import calculate_angle
 from exercise.algorithms.scoring import calculate_form_score
-from exercise.algorithms.recommendation import _insertion_sort_descending, _score_exercise
+from exercise.algorithms.recommendation import _insertion_sort_descending, extract_exercise_vector, extract_user_vector, calculate_cosine_similarity
 
 
 # ============================================================================
@@ -149,10 +149,9 @@ class TestInsertionSort(unittest.TestCase):
         self.assertEqual([i['name'] for i in result], ['A', 'B', 'C'])
 
 
-class TestScoreExercise(unittest.TestCase):
+class TestContentBasedFiltering(unittest.TestCase):
     def _make_exercise(self, age_groups_allowed=None, goal_tags=None,
-                       difficulty='Intermediate', high_impact=False,
-                       angle_ranges=None):
+                       difficulty='Intermediate', high_impact=False):
         class FakeExercise:
             pass
         ex = FakeExercise()
@@ -160,32 +159,49 @@ class TestScoreExercise(unittest.TestCase):
         ex.goal_tags = goal_tags or []
         ex.difficulty = difficulty
         ex.high_impact = high_impact
-        ex.angle_ranges = angle_ranges or {}
         return ex
 
-    def test_perfect_match_all_criteria(self):
+    def test_cosine_similarity_perfect_match(self):
+        vec_a = [1.0, 0.0, 1.0, 0.0, 2.0, 0.4, 1.0]
+        vec_b = [1.0, 0.0, 1.0, 0.0, 2.0, 0.4, 1.0]
+        
+        sim = calculate_cosine_similarity(vec_a, vec_b)
+        self.assertAlmostEqual(sim, 1.0)
+        
+    def test_cosine_similarity_zero_magnitude(self):
+        vec_a = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        vec_b = [1.0, 0.0, 1.0, 0.0, 2.0, 0.4, 1.0]
+        
+        sim = calculate_cosine_similarity(vec_a, vec_b)
+        self.assertEqual(sim, 0.0)
+        
+    def test_exercise_vector(self):
         ex = self._make_exercise(
             age_groups_allowed=['26-40'],
             goal_tags=['weight_loss'],
             difficulty='Intermediate',
-            angle_ranges={'26-40': {'bottom_min': 60}}
+            high_impact=True
         )
-        score = _score_exercise(ex, '26-40', 'weight_loss', 22.0)
-        self.assertEqual(score, 110)
-
-    def test_age_band_mismatch_no_base_points(self):
+        vec = extract_exercise_vector(ex, '26-40')
+        # [goal_weight_loss(1.0), goal_weight_gain(0.0), goal_flex(0.0), goal_stay(0.0),
+        #  age(2.0), difficulty(2/5=0.4), high_impact(1.0)]
+        self.assertEqual(vec, [1.0, 0.0, 0.0, 0.0, 2.0, 0.4, 1.0])
+        
+    def test_exercise_vector_wrong_age_band(self):
         ex = self._make_exercise(
             age_groups_allowed=['18-25'],
             goal_tags=['weight_loss'],
+            difficulty='Beginner',
+            high_impact=False
         )
-        score = _score_exercise(ex, '60+', 'weight_loss', 22.0)
-        self.assertEqual(score, 60)
-
-    def test_high_impact_bmi_penalty(self):
-        ex = self._make_exercise(
-            age_groups_allowed=['26-40'],
-            goal_tags=['weight_loss'],
-            high_impact=True
-        )
-        score = _score_exercise(ex, '26-40', 'weight_loss', 35.0)
-        self.assertEqual(score, 80)
+        vec = extract_exercise_vector(ex, '60+')
+        # age should be 0.0 because it's not allowed
+        # diff is Beginner = 1.0 / 5.0 = 0.2
+        self.assertEqual(vec, [1.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0])
+        
+    def test_user_vector(self):
+        # bmi 35.0 means impact_tolerance = 0.0
+        # band 26-40 means diff_preferred = 2.0 / 5.0 = 0.4, age = 2.0
+        # goal = weight_loss
+        vec = extract_user_vector('26-40', 'weight_loss', 35.0)
+        self.assertEqual(vec, [1.0, 0.0, 0.0, 0.0, 2.0, 0.4, 0.0])

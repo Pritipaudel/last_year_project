@@ -290,12 +290,12 @@ def get_personalized_exercises(user) -> list[dict]:
     band = _safe_band(profile) if profile else '26-40'
     goal_tag = _resolve_goal_tag(profile.goal if profile else None)
 
-    # Algorithm 4: Weighted Multi-Criteria Scoring and Ranking.
+    # Content-Based Filtering Recommendation Algorithm (Cosine Similarity).
     # Fetch ALL exercises from the database (no pre-filter).
-    # rank_exercises_by_suitability() scores each exercise on four weighted criteria
-    # (age band match, goal match, BMI suitability, difficulty appropriateness)
-    # and returns them sorted descending by score using insertion sort.
-    # Only exercises with score > 0 are returned to the frontend.
+    # rank_exercises_by_suitability() extracts feature vectors for the user and 
+    # each exercise, computes the cosine similarity between them in n-dimensional space,
+    # and returns them sorted descending by similarity using insertion sort.
+    # Only exercises with cosine similarity > 0 are returned to the frontend.
     all_exercises = list(Exercise.objects.all())
     ranked = rank_exercises_by_suitability(all_exercises, profile)
 
