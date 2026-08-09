@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ROUTES } from "@/constants/routes";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -93,6 +94,8 @@ export function HomePage() {
           </nav>
 
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+
             {isAuthenticated ? (
               <Button 
                 onClick={() => navigate(ROUTES.DASHBOARD)}

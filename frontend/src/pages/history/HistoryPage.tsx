@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Calendar, Activity, CheckCircle2, AlertCircle, History, Clock, Trophy } from "lucide-react";
+import { Calendar, Activity, History, Clock, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
 import { Header } from "@/components/layout/Header";
-import { Card, CardContent } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { PageTransition } from "@/components/common/PageTransition";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { exerciseService, WorkoutSession } from "@/services/exerciseService";
@@ -10,12 +10,14 @@ import { exerciseService, WorkoutSession } from "@/services/exerciseService";
 export function HistoryPage() {
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         const data = await exerciseService.getSessions();
-        setSessions(data);
+        setSessions(data || []);
       } catch (error) {
         console.error("Failed to load workout history", error);
       } finally {
@@ -30,6 +32,17 @@ export function HistoryPage() {
   }
 
   const totalMinutes = sessions.reduce((acc, s) => acc + s.duration_minutes, 0);
+  const totalPages = Math.ceil(sessions.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, sessions.length);
+  const visibleSessions = sessions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   return (
     <PageTransition variant="fade" className="flex flex-col min-h-screen pb-24 bg-neutral-50 dark:bg-black">
@@ -44,15 +57,15 @@ export function HistoryPage() {
                 <Trophy className="h-5 w-5 text-[var(--primary-light)] dark:text-emerald-400" />
               </div>
               <span className="text-xs uppercase font-bold text-[var(--bg-dashboard)] tracking-wider">
-                sessions
+                Total Sessions
               </span>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-4xl font-black text-[var(--bg-dashboard)] tracking-tight">
-                {totalMinutes}
+                {sessions.length}
               </span>
               <span className="text-sm font-medium text-[var(--border-card)]/60">
-                mins
+                completed
               </span>
             </div>
           </Card>
@@ -76,7 +89,7 @@ export function HistoryPage() {
           </Card>
         </div>
 
-        {/* TIMELINE */}
+        {/* TIMELINE TABLE */}
         <div className="bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 rounded-xl overflow-hidden shadow-sm">
           {/* HEADER */}
           <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-neutral-800">
@@ -85,14 +98,16 @@ export function HistoryPage() {
               <span>Recent Activity</span>
             </div>
             <span className="text-xs text-neutral-400 font-medium">
-              {sessions.length} {sessions.length === 1 ? 'entry' : 'entries'}
+              {sessions.length > 0
+                ? `Showing ${startIndex + 1}–${endIndex} of ${sessions.length} entries`
+                : "0 entries"}
             </span>
           </div>
 
           {/* SESSIONS LIST */}
-          {sessions.length > 0 ? (
+          {visibleSessions.length > 0 ? (
             <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {sessions.map((session) => {
+              {visibleSessions.map((session) => {
                 const errors = session.metadata?.form_errors || [];
                 const hasErrors = errors.length > 0;
 
@@ -142,8 +157,6 @@ export function HistoryPage() {
                           </span>
                         </div>
 
-
-
                       </div>
                     </div>
                   </div>
@@ -157,6 +170,50 @@ export function HistoryPage() {
               <p className="text-sm text-neutral-500 mt-2">Your exercise history will appear here once you complete your first AI-guided session.</p>
             </div>
           )}
+
+          {/* PAGINATION FOOTER */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 text-xs font-semibold rounded-lg px-3 py-1.5 border-neutral-200 dark:border-neutral-700"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Previous</span>
+              </Button>
+
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      currentPage === pageNum
+                        ? "bg-[var(--primary-solid)] text-white shadow-sm"
+                        : "bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 text-xs font-semibold rounded-lg px-3 py-1.5 border-neutral-200 dark:border-neutral-700"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
         </div>
       </div>
     </PageTransition>

@@ -115,7 +115,10 @@ export function createTreePoseTracker(
   let lastPhase: TreePhase = 'invisible';
   let lastActiveLeg: 'left' | 'right' | null = null;
   let consecutiveInvisibleFrames = 0;
+  let consecutiveVisibleFrames = 0;
   let consecutiveStandingFrames = 0;
+  let consecutiveLegFrames = 0;
+  let pendingLeg: 'left' | 'right' | null = null;
 
   // ── helpers ──
 
@@ -133,7 +136,7 @@ export function createTreePoseTracker(
     if (goodBalance) {
       s.consecutive++;
       const wasHolding = s.isHolding;
-      s.isHolding = s.consecutive >= T.min_hold_frames;
+      s.isHolding = s.consecutive >= 1;
       s.graceWarned = false;
 
       if (s.isHolding) {
@@ -141,7 +144,7 @@ export function createTreePoseTracker(
           const msg = s.everHeld
             ? `Good, resuming ${legLabel} leg hold.`
             : `Great! Hold that position on your ${legLabel} leg.`;
-          speak(msg, `tree_hold_${legLabel}`, 3000);
+          speak(msg, `tree_hold_${legLabel}`, 6000);
           s.everHeld = true;
         }
         s.lastGoodAt = now;
@@ -150,7 +153,7 @@ export function createTreePoseTracker(
           s.holdStartedAt = now;
         } else {
           const delta = (now - s.holdStartedAt) / 1000;
-          if (delta > 0) {
+          if (delta > 0 && delta < 1.0) {
             s.accumulated = Math.min(s.accumulated + delta, H.target_hold_seconds);
           }
           s.holdStartedAt = now;
@@ -159,18 +162,17 @@ export function createTreePoseTracker(
     } else {
       s.consecutive = 0;
       s.holdStartedAt = null;
-      const wasHolding = s.isHolding;
       s.isHolding = false;
 
       if (s.lastGoodAt > 0) {
         const gap = (now - s.lastGoodAt) / 1000;
-        if (gap > H.grace_period_seconds && !s.graceWarned) {
+        if (gap > (H.grace_period_seconds || 3.0) && !s.graceWarned) {
           s.graceWarned = true;
           s.accumulated = 0;
           s.lastGoodAt  = 0;
           s.everHeld    = false;
           speak(
-            `Balance lost on ${legLabel} leg. Timer has been reset.`,
+            `Balance lost on ${legLabel} leg. Timer reset.`,
             `tree_grace_${legLabel}`,
             3000,
           );
@@ -184,65 +186,112 @@ export function createTreePoseTracker(
   return {
     processFrame(lm: any[], now: number): TreePoseResult {
 
-      // ── 1. Visibility phase with frame debouncing ──────────────────────
-      const fullBodyOk =
-        vis(lm[0], 0.35) &&
-        vis(lm[11], 0.40) &&
-        vis(lm[12], 0.40) &&
-        vis(lm[23], 0.40) &&
-        vis(lm[24], 0.40) &&
-        vis(lm[25], 0.30) &&
-        vis(lm[26], 0.30) &&
-        vis(lm[27], 0.30) &&
-        vis(lm[28], 0.30);
+      // ── 1. Visibility phase (requires head, shoulders, hips, knees, BOTH ankles) ──
+      const headOk      = vis(lm[0], 0.35);
+      const shouldersOk = vis(lm[11], 0.35) && vis(lm[12], 0.35);
+      const hipsOk      = vis(lm[23], 0.35) && vis(lm[24], 0.35);
+      const kneesOk     = vis(lm[25], 0.35) && vis(lm[26], 0.35);
+      const anklesOk    = vis(lm[27], 0.30) && vis(lm[28], 0.30);
+      const fullBodyOk  = headOk && shouldersOk && hipsOk && kneesOk && anklesOk;
 
       if (!fullBodyOk) {
         consecutiveInvisibleFrames++;
-        if (consecutiveInvisibleFrames >= 8) {
+        consecutiveVisibleFrames = 0;
+        pauseLeg(left);
+        pauseLeg(right);
+        consecutiveLegFrames = 0;
+        pendingLeg = null;
+
+        if (consecutiveInvisibleFrames >= 2) {
           if (lastPhase !== 'invisible') {
-            speak(
-              "I can't see you clearly. Step back so your full body is in frame.",
-              'tree_invisible',
-              7000,
-            );
             lastPhase = 'invisible';
             lastActiveLeg = null;
+            speak(
+              "Step back so your full body is in frame.",
+              'tree_invisible',
+              6000,
+            );
           }
-          pauseLeg(left);
-          pauseLeg(right);
           return buildResult(left, right, null, 'invisible', H.target_hold_seconds);
         }
+        return buildResult(left, right, null, lastPhase, H.target_hold_seconds);
       } else {
         consecutiveInvisibleFrames = 0;
+        consecutiveVisibleFrames++;
       }
 
-      // ── 2. Determine which leg is raised ────────────────────────────────
-      const lKneeY = lm[25]?.y ?? 0.5;
-      const rKneeY = lm[26]?.y ?? 0.5;
+      // Require 6 consecutive full-body frames before leaving invisible phase
+      if (lastPhase === 'invisible' && consecutiveVisibleFrames < 6) {
+        pauseLeg(left);
+        pauseLeg(right);
+        return buildResult(left, right, null, 'invisible', H.target_hold_seconds);
+      }
+
+      // ── 2. Determine Tree Pose leg stance (distinguish from walking/standing) ────────
+      const lKneeY  = lm[25]?.y ?? 0.5;
+      const rKneeY  = lm[26]?.y ?? 0.5;
       const lAnkleY = lm[27]?.y ?? 0.5;
       const rAnkleY = lm[28]?.y ?? 0.5;
 
-      const lAnkleRaised = (rAnkleY - lAnkleY) > 0.05;
-      const rAnkleRaised = (lAnkleY - rAnkleY) > 0.05;
-      const kneeGap = Math.abs(lKneeY - rKneeY);
+      const lKneeX  = lm[25]?.x ?? 0.5;
+      const rKneeX  = lm[26]?.x ?? 0.5;
+      const lAnkleX = lm[27]?.x ?? 0.5;
+      const rAnkleX = lm[28]?.x ?? 0.5;
 
-      let detectedLeg: 'left' | 'right' | null = null;
-      if (lAnkleRaised || (kneeGap > 0.035 && lKneeY < rKneeY)) {
-        detectedLeg = 'left';
-      } else if (rAnkleRaised || (kneeGap > 0.035 && rKneeY < lKneeY)) {
-        detectedLeg = 'right';
+      // Tree Pose requires:
+      // A) Raised ankle elevated above standing ankle by > 0.05
+      // B) Raised ankle placed close to standing leg line horizontally (< 0.18)
+      // C) Raised knee flared outward sideways (> 0.08)
+      const lAnkleElevated = (rAnkleY - lAnkleY > 0.05);
+      const lAnkleNearLeg  = Math.abs(lAnkleX - rKneeX) < 0.18 || lAnkleY < rKneeY + 0.10;
+      const lKneeFlared    = Math.abs(lKneeX - rKneeX) > 0.08 || lKneeY < rKneeY - 0.02;
+
+      const rAnkleElevated = (lAnkleY - rAnkleY > 0.05);
+      const rAnkleNearLeg  = Math.abs(rAnkleX - lKneeX) < 0.18 || rAnkleY < lKneeY + 0.10;
+      const rKneeFlared    = Math.abs(rKneeX - lKneeX) > 0.08 || rKneeY < lKneeY - 0.02;
+
+      const isLeftTreeStance  = lAnkleElevated && lAnkleNearLeg && lKneeFlared;
+      const isRightTreeStance = rAnkleElevated && rAnkleNearLeg && rKneeFlared;
+
+      let detectedStance: 'left' | 'right' | null = null;
+      if (isLeftTreeStance && !isRightTreeStance) {
+        detectedStance = 'left';
+      } else if (isRightTreeStance && !isLeftTreeStance) {
+        detectedStance = 'right';
       }
 
-      const activeLeg: 'left' | 'right' | null = detectedLeg;
+      // Debounce raised leg stance over 4 consecutive frames
+      if (detectedStance !== null) {
+        if (pendingLeg === detectedStance) {
+          consecutiveLegFrames++;
+        } else {
+          pendingLeg = detectedStance;
+          consecutiveLegFrames = 1;
+        }
+      } else {
+        consecutiveLegFrames = 0;
+        pendingLeg = null;
+      }
 
-      // ── 3. STANDING phase (both feet on ground) with debouncing ────────
+      const activeLeg: 'left' | 'right' | null = consecutiveLegFrames >= 4 ? pendingLeg : null;
+
+      // ── 3. STANDING phase (both feet on ground) ───────────────────────────
       if (activeLeg === null) {
         consecutiveStandingFrames++;
-        if (consecutiveStandingFrames >= 5) {
-          if (lastPhase !== 'standing') {
+        if (consecutiveStandingFrames >= 3) {
+          if (lastPhase === 'active') {
+            // User dropped their leg down back to floor
+            speak(
+              "Place your foot back up on your inner thigh or calf.",
+              'tree_both_legs_down',
+              6000,
+            );
+            lastPhase = 'standing';
+          } else if (lastPhase !== 'standing') {
+            // User just stepped back into frame or initialized full body view
             lastPhase = 'standing';
             speak(
-              "Perfect, let's start! Raise one leg and place your foot on your inner thigh.",
+              "Perfect, let's start! Raise one leg and place your foot on your inner thigh or calf.",
               'tree_standing',
               8000,
             );
@@ -252,6 +301,7 @@ export function createTreePoseTracker(
           lastActiveLeg = null;
           return buildResult(left, right, null, 'standing', H.target_hold_seconds);
         }
+        return buildResult(left, right, null, lastPhase, H.target_hold_seconds);
       } else {
         consecutiveStandingFrames = 0;
       }
@@ -291,49 +341,35 @@ export function createTreePoseTracker(
       // A. Standing knee angle
       if (vis(lm[sHipIdx]) && vis(lm[sKneeIdx]) && vis(lm[sAnkleIdx])) {
         const kAngle = angle(lm[sHipIdx], lm[sKneeIdx], lm[sAnkleIdx]);
-        if (kAngle < T.standing_knee_min_angle) errors.push('knee_bent');
+        if (kAngle < 135) {
+          errors.push('knee_bent');
+        }
       }
 
       // B. Hip levelness
       if (vis(lm[23]) && vis(lm[24])) {
         const hipDiff = Math.abs(lm[23].y - lm[24].y);
         const torsoH  = Math.abs((lm[11].y - lm[23].y)) || 0.001;
-        if (hipDiff / torsoH > T.hip_levelness_threshold) errors.push('hip_unlevel');
+        if (hipDiff / torsoH > 0.40) errors.push('hip_unlevel');
       }
 
       // C. Trunk sway
       if (vis(lm[11]) && vis(lm[12]) && vis(lm[sAnkleIdx])) {
         const sMidX = (lm[11].x + lm[12].x) / 2;
-        if (Math.abs(sMidX - lm[sAnkleIdx].x) > T.trunk_sway_threshold)
+        if (Math.abs(sMidX - lm[sAnkleIdx].x) > 0.35) {
           errors.push('trunk_sway');
+        }
       }
 
-      // D. Raised-foot height (only if raised ankle is visible)
-      const tgtLmIdx =
-        H.foot_placement_landmark === 'hip'   ? sHipIdx
-        : H.foot_placement_landmark === 'knee'  ? sKneeIdx
-        : H.foot_placement_landmark === 'ankle' ? sAnkleIdx
-        : null;
-
-      if (tgtLmIdx !== null && vis(lm[rAnkleIdx], 0.35) && vis(lm[tgtLmIdx], 0.35)) {
-        const threshold = H.foot_placement_landmark === 'hip' ? 0.22 : 0.15;
-        if (lm[rAnkleIdx].y > lm[tgtLmIdx].y + threshold) errors.push('foot_too_low');
-      }
-
-      // E. Arm / prayer hands (advisory — does NOT stop the timer)
-      if (T.wrist_height_symmetry_threshold !== null && vis(lm[15]) && vis(lm[16])) {
-        const wDist = Math.hypot(lm[15].x - lm[16].x, lm[15].y - lm[16].y);
-        const sYMid = (lm[11].y + lm[12].y) / 2;
-        const hYMid = (lm[23].y + lm[24].y) / 2;
-        if (wDist > 0.25 || lm[15].y < sYMid - 0.1 || lm[15].y > hYMid + 0.1) {
-          if (config.voice_cues['arms_asymmetric']) errors.push('arms_asymmetric');
+      // D. Raised-foot height
+      if (vis(lm[rAnkleIdx], 0.20) && vis(lm[sAnkleIdx], 0.20)) {
+        if (lm[rAnkleIdx].y > lm[sAnkleIdx].y - 0.02) {
+          errors.push('foot_too_low');
         }
       }
 
       // ── 6. Evaluate balance quality ──────────────────────────────────────
-      const criticalErrors = errors.filter(e =>
-        ['knee_bent', 'hip_unlevel', 'trunk_sway', 'foot_too_low'].includes(e),
-      );
+      const criticalErrors = errors.filter(e => ['knee_bent', 'foot_too_low'].includes(e));
       const goodBalance = criticalErrors.length === 0;
 
       // ── 7. Fire feedback ─────────────────────────────────────────────────
@@ -343,19 +379,17 @@ export function createTreePoseTracker(
           speak('Perfect! Keep holding.', 'tree_perfect', 15000);
         }
       } else {
-const DEFAULT_TREE_CUES: Record<string, string> = {
-  knee_bent: "Keep your standing leg straight.",
-  hip_unlevel: "Keep your hips level and square.",
-  trunk_sway: "Keep your torso vertical and centered.",
-  foot_too_low: "Place your raised foot higher on your inner thigh.",
-  arms_asymmetric: "Bring your hands together in prayer position.",
-  forward_head: "Keep your head up and neck straight.",
-};
+        const DEFAULT_TREE_CUES: Record<string, string> = {
+          knee_bent: "Straighten your standing leg.",
+          hip_unlevel: "Keep your hips level.",
+          trunk_sway: "Keep your torso vertical and centered.",
+          foot_too_low: "Keep your foot placed on your calf or inner thigh.",
+          arms_asymmetric: "Bring your hands together in prayer position.",
+        };
 
-        // Fire highest-priority correction cue
-        for (const key of config.voice_cue_priority) {
+        for (const key of ['knee_bent', 'foot_too_low', 'trunk_sway', 'hip_unlevel']) {
           if (errors.includes(key)) {
-            const cueText = config.voice_cues[key] || DEFAULT_TREE_CUES[key] || "Adjust your posture.";
+            const cueText = DEFAULT_TREE_CUES[key] || "Adjust your posture.";
             speak(cueText, `err_${key}`, CD);
             fireError(key, currentLeg, getTimestamp());
             break;

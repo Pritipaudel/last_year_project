@@ -37,3 +37,52 @@
   --coral-surface: #fce8df;
   --coral-text: #c05c3a;
 }
+
+/* Google Translate UI Clean Up - Complete Removal of Top Banner */
+.goog-te-banner-frame,
+iframe.goog-te-banner-frame,
+.goog-te-banner,
+.goog-te-balloon-frame,
+#goog-gt-tt,
+.goog-te-spinner-pos,
+.goog-te-menu-value,
+.goog-te-gadget-simple,
+.goog-te-gadget-icon,
+body > .skiptranslate,
+iframe[id*=":1.container"],
+iframe[id*=":2.container"],
+iframe[class*="goog-te-banner-frame"],
+iframe[src*="translate.google"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0px !important;
+  width: 0px !important;
+  pointer-events: none !important;
+}
+
+html, body {
+  top: 0px !important;
+  position: static !important;
+  margin-top: 0px !important;
+  padding-top: 0px !important;
+}
+
+.goog-te-gadget,
+#google_translate_element {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+.goog-tooltip,
+.goog-tooltip:hover,
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}

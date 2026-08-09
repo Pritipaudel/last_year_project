@@ -588,60 +588,60 @@ export function ActiveWorkoutPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 px-4 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl">
+          <div className="flex items-center gap-3 px-4 py-2 bg-black/60 rounded-xl border border-white/10 backdrop-blur-3xl shadow-md">
             {isCurl ? (
               <>
-                <div className="flex flex-col items-center">
-                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)]">L ARM</span>
-                  <span className="text-lg font-black">{repsLeft}</span>
+                <div className="flex flex-col items-center min-w-[36px]">
+                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)] notranslate">L ARM</span>
+                  <span className="text-lg font-black notranslate tabular-nums">{repsLeft}</span>
                 </div>
                 <div className="w-[1px] h-4 bg-white/10" />
-                <div className="flex flex-col items-center">
-                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)]">REPS</span>
-                  <span className="text-xl font-black">{reps}</span>
+                <div className="flex flex-col items-center min-w-[36px]">
+                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)] notranslate">REPS</span>
+                  <span className="text-xl font-black notranslate tabular-nums">{reps}</span>
                 </div>
                 <div className="w-[1px] h-4 bg-white/10" />
-                <div className="flex flex-col items-center">
-                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)]">R ARM</span>
-                  <span className="text-lg font-black">{repsRight}</span>
+                <div className="flex flex-col items-center min-w-[36px]">
+                  <span className="text-[7px] uppercase font-black text-[var(--primary-light)] notranslate">R ARM</span>
+                  <span className="text-lg font-black notranslate tabular-nums">{repsRight}</span>
                 </div>
               </>
             ) : isStatic ? (
               <>
                 {(exercise?.name.toLowerCase().includes('butterfly') || exercise?.name.toLowerCase().includes('baddha')) ? (
-                  <div className="flex flex-col items-center">
-                    <span className={`text-[7px] uppercase font-black ${treeIsHolding ? 'text-green-400' : 'text-blue-400'}`}>HOLD</span>
-                    <span className="text-lg font-black">{Math.floor(treeHoldLeft)}s</span>
+                  <div className="flex flex-col items-center min-w-[44px]">
+                    <span className={`text-[7px] uppercase font-black notranslate ${treeIsHolding ? 'text-green-400' : 'text-blue-400'}`}>HOLD</span>
+                    <span className="text-lg font-black notranslate tabular-nums">{Math.floor(treeHoldLeft)}s</span>
                   </div>
                 ) : (
                   <>
-                    <div className="flex flex-col items-center">
-                      <span className={`text-[7px] uppercase font-black ${treeIsHolding && treeActiveLeg === 'left' ? 'text-green-400' : 'text-blue-400'}`}>L LEG</span>
-                      <span className="text-lg font-black">{Math.floor(treeHoldLeft)}s</span>
+                    <div className="flex flex-col items-center min-w-[44px]">
+                      <span className={`text-[7px] uppercase font-black notranslate ${treeIsHolding && treeActiveLeg === 'left' ? 'text-green-400' : 'text-blue-400'}`}>L LEG</span>
+                      <span className="text-lg font-black notranslate tabular-nums">{Math.floor(treeHoldLeft)}s</span>
                     </div>
                     <div className="w-[1px] h-4 bg-white/10" />
-                    <div className="flex flex-col items-center">
-                      <span className={`text-[7px] uppercase font-black ${treeIsHolding && treeActiveLeg === 'right' ? 'text-green-400' : 'text-blue-400'}`}>R LEG</span>
-                      <span className="text-lg font-black">{Math.floor(treeHoldRight)}s</span>
+                    <div className="flex flex-col items-center min-w-[44px]">
+                      <span className={`text-[7px] uppercase font-black notranslate ${treeIsHolding && treeActiveLeg === 'right' ? 'text-green-400' : 'text-blue-400'}`}>R LEG</span>
+                      <span className="text-lg font-black notranslate tabular-nums">{Math.floor(treeHoldRight)}s</span>
                     </div>
                   </>
                 )}
                 <div className="w-[1px] h-4 bg-white/10" />
-                <div className="flex flex-col items-center">
-                  <span className="text-[7px] uppercase font-black text-primary">TARGET</span>
-                  <span className="text-xl font-black">{treeTarget}s</span>
+                <div className="flex flex-col items-center min-w-[44px]">
+                  <span className="text-[7px] uppercase font-black text-primary notranslate">TARGET</span>
+                  <span className="text-xl font-black notranslate tabular-nums">{treeTarget}s</span>
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center">
-                <span className="text-[8px] uppercase font-black text-primary">Reps</span>
-                <span className="text-xl font-black">{reps}</span>
+              <div className="flex flex-col items-center min-w-[36px]">
+                <span className="text-[8px] uppercase font-black text-primary notranslate">Reps</span>
+                <span className="text-xl font-black notranslate tabular-nums">{reps}</span>
               </div>
             )}
             <div className="w-[1px] h-4 bg-white/10" />
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] uppercase font-black text-white/40">Time</span>
-              <span className="text-xl font-mono">{formatTime(seconds)}</span>
+            <div className="flex flex-col items-center min-w-[56px]">
+              <span className="text-[8px] uppercase font-black text-white/40 notranslate">Time</span>
+              <span className="text-xl font-mono notranslate tabular-nums w-14 text-center inline-block">{formatTime(seconds)}</span>
             </div>
           </div>
         </div>
@@ -666,14 +666,20 @@ export function ActiveWorkoutPage() {
         ) : (
           <div className="w-full h-full relative">
             <canvas ref={canvasRef} className="w-full h-full object-cover" width={640} height={480} />
-            {trackingStatus !== 'tracking' && (
-              <div className="absolute inset-x-0 bottom-32 flex justify-center px-6">
-                <div className="px-10 py-4 bg-black/80 rounded-full border border-primary/20 flex items-center gap-4">
-                  <div className="h-2 w-2 rounded-full animate-pulse bg-primary" />
-                  <p className="text-[10px] font-black text-white uppercase tracking-widest">{trackingStatus.toUpperCase()}</p>
-                </div>
+            <div className="absolute inset-x-0 bottom-32 flex justify-center px-6 pointer-events-none">
+              <div className={`px-8 py-3 bg-black/85 rounded-full border transition-all duration-300 flex items-center gap-3 shadow-xl backdrop-blur-md ${
+                trackingStatus === 'tracking' 
+                  ? 'border-emerald-500/30 opacity-0' 
+                  : 'border-amber-500/40 opacity-100'
+              }`}>
+                <div className={`h-2.5 w-2.5 rounded-full animate-pulse ${
+                  trackingStatus === 'lost' ? 'bg-red-500' : 'bg-amber-400'
+                }`} />
+                <p className="text-xs font-extrabold text-white uppercase tracking-widest notranslate">
+                  {trackingStatus === 'lost' ? 'STEP BACK INTO FRAME' : 'CALIBRATING POSE'}
+                </p>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>

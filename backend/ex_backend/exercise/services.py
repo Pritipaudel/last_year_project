@@ -144,6 +144,11 @@ def _personalize(user, exercise: Exercise, band: str, goal_tag: str) -> dict:
     # ----- VOICE CUES -----
     band_cues_raw = exercise.voice_cues.get(band, default_cues)
 
+    # Pre-rendered TTS clips for this band, keyed by error type. Missing keys are
+    # expected (a cue may not have been seeded yet) — the frontend falls back to
+    # Web Speech synthesis for any cue without a URL here.
+    band_cue_audio = (exercise.voice_cue_audio or {}).get(band, {})
+
     # Priority order — default (squat). Curl exercises override this below.
     priority_order = [
         'insufficient_depth',
@@ -226,6 +231,9 @@ def _personalize(user, exercise: Exercise, band: str, goal_tag: str) -> dict:
                 'alignment_thresholds': band_angles,
                 'hold_config': band_hold_config,
                 'voice_cues': band_cues_prioritised,
+                'voice_cue_audio': {
+                    k: band_cue_audio[k] for k in priority_order if band_cue_audio.get(k)
+                },
                 'voice_cue_priority': priority_order,
                 'cue_cooldown_seconds': 8,
                 'postural_flags': deviations,
@@ -263,6 +271,9 @@ def _personalize(user, exercise: Exercise, band: str, goal_tag: str) -> dict:
             'angle_ranges': band_angles,
             'rep_config': band_rep,
             'voice_cues': band_cues_prioritised,
+            'voice_cue_audio': {
+                k: band_cue_audio[k] for k in priority_order if band_cue_audio.get(k)
+            },
             'voice_cue_priority': priority_order,
             'cue_cooldown_seconds': 8,
         },

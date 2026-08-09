@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 interface HeaderProps {
   title: string;
@@ -39,11 +40,14 @@ export function Header({ title, showBack = false, onBack, rightAction }: HeaderP
         </h1>
       </div>
       
-      {rightAction && (
-        <div className="flex items-center">
-          {rightAction}
-        </div>
-      )}
+      <div className="flex items-center gap-3">
+        <LanguageSwitcher />
+        {rightAction && (
+          <div className="flex items-center">
+            {rightAction}
+          </div>
+        )}
+      </div>
     </header>
   );
 }

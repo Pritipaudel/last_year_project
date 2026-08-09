@@ -1,0 +1,37 @@
+{
+  "name": "PoseFit - AI Exercise & Pose Tracker",
+  "short_name": "PoseFit",
+  "description": "AI-powered real-time pose tracking and personalized exercise feedback system.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["fitness", "health", "sports"],
+  "shortcuts": [
+    {
+      "name": "Start Workout",
+      "url": "/exercises",
+      "description": "Jump straight into your exercise session"
+    },
+    {
+      "name": "View History",
+      "url": "/history",
+      "description": "Check your workout history and hold stats"
+    }
+  ]
+}

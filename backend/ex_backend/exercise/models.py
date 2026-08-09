@@ -63,6 +63,16 @@ class Exercise(models.Model):
         help_text='Per-age-band cue text strings keyed by error type'
     )
 
+    # Pre-rendered TTS audio for each cue in voice_cues, same key structure:
+    # {"18-25": {"body_swing": "/media/voice_cues/<hash>.wav", ...}, ...}
+    # Populated by `manage.py seed_voice_cue_audio`. The frontend plays this
+    # clip when present and falls back to Web Speech synthesis when it is not.
+    voice_cue_audio = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Per-age-band pre-rendered cue audio URLs keyed by error type'
+    )
+
     # --- Algorithm 4: Weighted Recommendation fields ---
 
     # Which age bands this exercise is appropriate for.

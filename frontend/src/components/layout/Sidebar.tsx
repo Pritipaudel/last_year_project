@@ -2,17 +2,19 @@ import { Link, useLocation } from "react-router-dom";
 import { Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAVIGATION_ITEMS } from "@/constants/navigation";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 export function Sidebar() {
   const location = useLocation();
 
   return (
     <aside className="hidden w-64 flex-col border-r bg-[var-(--bg-background)] md:flex h-screen fixed top-0 left-0">
-      <div className="flex h-16 items-center border-b px-6">
+      <div className="flex h-16 items-center justify-between border-b px-6">
         <Link to="/dashboard" className="flex items-center gap-2 font-bold text-[var(--primary-hover)]/80 text-xl">
           <Activity className="h-6 w-6" />
           <span>PoseFit</span>
         </Link>
+        <LanguageSwitcher />
       </div>
       
       <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">

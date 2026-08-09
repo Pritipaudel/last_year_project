@@ -1,4 +1,5 @@
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -79,3 +80,34 @@ class HoldSessionSummaryCreateView(APIView):
             result = serializer.create(serializer.validated_data)
             return Response(result, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DynamicTTSView(APIView):
+    """
+    GET /api/exercises/tts/?text=...
+    Synthesizes or retrieves cached TTS audio for any given text string on the fly.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        import hashlib
+        from pathlib import Path
+        from django.conf import settings
+        from django.http import FileResponse
+
+        text = request.query_params.get('text', '').strip()
+        if not text:
+            return Response({'detail': 'text query parameter is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
+        output_dir = Path(settings.MEDIA_ROOT) / "voice_cues"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        file_path = output_dir / f"dynamic_{text_hash}.mp3"
+
+        if not file_path.exists():
+            from gtts import gTTS
+            tts = gTTS(text=text, lang="en")
+            tts.save(str(file_path))
+
+        return FileResponse(open(file_path, 'rb'), content_type="audio/mpeg")
+
