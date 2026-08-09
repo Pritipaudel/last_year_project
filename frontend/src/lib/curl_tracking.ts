@@ -296,8 +296,17 @@ export function createCurlTracker(
     // Helpers
     // ------------------------------------------------------------------
 
-    function fireError(type: string, cueText: string, _side: string): void {
-        speak(cueText, `curl_${type}`, COOLDOWN_MS);
+    const DEFAULT_CURL_CUES: Record<string, string> = {
+        insufficient_curl: "Curl higher up to full contraction.",
+        incomplete_extension: "Fully extend your arms at the bottom.",
+        body_swing: "Keep your body still, avoid swinging.",
+        elbow_swing: "Keep your elbows tucked into your sides.",
+        shoulder_elevation: "Keep your shoulders down, do not shrug.",
+    };
+
+    function fireError(type: string, cueText: string | undefined, _side: string): void {
+        const text = cueText || DEFAULT_CURL_CUES[type] || "Adjust your form and angle.";
+        speak(text, `curl_${type}`, COOLDOWN_MS);
         errorCounts[type] = (errorCounts[type] || 0) + 1;
         logError(type, getElapsedSeconds());
     }

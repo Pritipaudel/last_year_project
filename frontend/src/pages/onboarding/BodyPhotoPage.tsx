@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, CheckCircle2, RotateCcw, ThumbsUp } from "lucide-react";
+import { Camera, CheckCircle2, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageTransition } from "@/components/common/PageTransition";
 import { useOnboardingStore } from "@/store/onboardingStore";
-import { initializeCamera, processPose, stopCamera } from "@/lib/camera_mediapipe";
+import { initializeCamera, processPose, processPoseOnImage, stopCamera } from "@/lib/camera_mediapipe";
 import { biometricService } from "@/lib/api";
 import { useUIStore } from "@/store/uiStore";
 
@@ -16,9 +16,11 @@ export function BodyPhotoPage() {
   const { addToast } = useUIStore();
   const [photoCaptured, setPhotoCaptured] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [mode, setMode] = useState<"choice" | "camera" | "upload">("choice");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const lastAssessmentRef = useRef<any>(null);
 
   const startAnalysis = async () => {
@@ -55,82 +57,112 @@ export function BodyPhotoPage() {
     }
   };
 
+  // Require all 33 landmarks to be visible (visibility > 0.65)
+  // The user requested: "when our whole body all 33 landmarks are visible than only the image should be accepted"
+  const isFullBodyVisible = (landmarks: any) =>
+    !!landmarks && landmarks.length >= 33 && landmarks.every((l: any) => l.visibility && l.visibility > 0.65);
+
+  // Same payload shape for both the live camera capture and the uploaded photo:
+  // the browser does all pose extraction, the backend contract is unchanged.
+  const submitAssessment = async (assessment: any, dataUrl: string) => {
+    setIsAnalyzing(true);
+    await syncProfile();
+
+    try {
+      await biometricService.submitAssessment({
+        image: dataUrl,
+        raw_landmarks: assessment.landmarks,
+        joint_angles: {
+          knee: assessment.knee_angle,
+          knee_right: assessment.kneeAngleRight,
+          hip: assessment.hip_angle,
+          hip_right: assessment.hipAngleRight,
+          shoulder: assessment.shoulder_angle,
+          shoulder_right: assessment.shoulderAngleRight,
+          elbow: assessment.elbow_angle,
+          elbow_right: assessment.elbowAngleRight,
+          ankle: assessment.ankle_angle,
+          ankle_right: assessment.ankleAngleRight,
+          spine: assessment.spine_angle
+        },
+        deviations: assessment.deviations || {}
+      });
+      setPhotoCaptured(true);
+      setField("photoTaken", true);
+      addToast({ title: "Scan Complete", description: "Pose data and image stored safely.", type: "success" });
+    } catch (e) {
+      console.error("Assessment save failed", e);
+      addToast({ title: "Storage Error", description: "Failed to persist scan data. Try again.", type: "error" });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleCapture = async () => {
     if (!lastAssessmentRef.current) {
       addToast({ title: "Analysis Active", description: "Please wait for landmarks to position correctly.", type: "warning" });
       return;
     }
 
-    const landmarks = lastAssessmentRef.current.landmarks;
-    if (!landmarks || landmarks.length < 33) {
-      addToast({ title: "Full Body Required", description: "Could not detect your body. Step into the frame.", type: "warning" });
-      return;
-    }
-
-    // Require all 33 landmarks to be visible (visibility > 0.65)
-    // The user requested: "when our whole body all 33 landmarks are visible than only the image should be accepted"
-    const isFullyVisible = landmarks.every((l: any) => l.visibility && l.visibility > 0.65);
-    if (!isFullyVisible) {
+    if (!isFullBodyVisible(lastAssessmentRef.current.landmarks)) {
       addToast({ title: "Full Body Required", description: "Please ensure your entire body (head to toes) is clearly visible in the frame.", type: "warning" });
       return;
     }
 
-    setIsAnalyzing(true);
-    await syncProfile();
+    if (!videoRef.current || !canvasRef.current) return;
 
-    if (videoRef.current && canvasRef.current) {
-      // Capture current frame from canvas as base64 data URL
-      const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
+    // Capture current frame from canvas as base64 data URL, then release the camera
+    const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
+    stopCamera(videoRef.current);
 
-      const payload = {
-        image: dataUrl,
-        raw_landmarks: lastAssessmentRef.current.landmarks,
-        joint_angles: {
-          knee: lastAssessmentRef.current.knee_angle,
-          knee_right: lastAssessmentRef.current.kneeAngleRight,
-          hip: lastAssessmentRef.current.hip_angle,
-          hip_right: lastAssessmentRef.current.hipAngleRight,
-          shoulder: lastAssessmentRef.current.shoulder_angle,
-          shoulder_right: lastAssessmentRef.current.shoulderAngleRight,
-          elbow: lastAssessmentRef.current.elbow_angle,
-          elbow_right: lastAssessmentRef.current.elbowAngleRight,
-          ankle: lastAssessmentRef.current.ankle_angle,
-          ankle_right: lastAssessmentRef.current.ankleAngleRight,
-          spine: lastAssessmentRef.current.spine_angle
-        },
-        deviations: lastAssessmentRef.current.deviations || {}
-      };
-
-      try {
-        // Stop camera before showing "Captured" UI
-        stopCamera(videoRef.current!);
-
-        await biometricService.submitAssessment(payload);
-        setPhotoCaptured(true);
-        setField("photoTaken", true);
-        addToast({ title: "Scan Complete", description: "Pose data and image stored safely.", type: "success" });
-      } catch (e) {
-        console.error("Assessment save failed", e);
-        addToast({ title: "Storage Error", description: "Failed to persist scan data. Try again.", type: "error" });
-      } finally {
-        setIsAnalyzing(false);
-      }
-    }
+    await submitAssessment(lastAssessmentRef.current, dataUrl);
   };
 
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !canvasRef.current) return;
+
+    setIsAnalyzing(true);
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error("Image could not be decoded."));
+        el.src = objectUrl;
+      });
+
+      const assessment = await processPoseOnImage(image, canvasRef.current);
+      if (!assessment || !isFullBodyVisible(assessment.landmarks)) {
+        addToast({ title: "Full Body Required", description: "This photo must show your entire body (head to toes) clearly.", type: "warning" });
+        return;
+      }
+
+      lastAssessmentRef.current = assessment;
+      await submitAssessment(assessment, canvasRef.current.toDataURL('image/jpeg', 0.8));
+    } catch (e) {
+      console.error("Photo analysis failed", e);
+      addToast({ title: "Analysis Error", description: "Could not analyse that photo. Try another one.", type: "error" });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleRetake = () => {
     setPhotoCaptured(false);
     setField("photoTaken", false);
-    setTimeout(() => startAnalysis(), 100);
+    lastAssessmentRef.current = null;
+    setMode("choice");
   };
 
   useEffect(() => {
-    startAnalysis();
+    if (mode === "camera") startAnalysis();
     return () => {
       if (videoRef.current) stopCamera(videoRef.current);
     };
-  }, []);
+  }, [mode]);
 
   return (
     <PageTransition variant="slide" className="flex flex-col h-full overflow-y-auto pb-10 bg-[var(--bg-dashboard)]">
@@ -151,8 +183,15 @@ export function BodyPhotoPage() {
         >
           {!photoCaptured && (
             <>
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-60" />
-              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover z-10" width={640} height={480} />
+              {mode === "camera" && (
+                <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-60" />
+              )}
+              <canvas
+                ref={canvasRef}
+                className={`absolute inset-0 w-full h-full object-cover z-10 ${mode === "choice" ? "hidden" : ""}`}
+                width={640}
+                height={480}
+              />
             </>
           )}
 
@@ -165,9 +204,20 @@ export function BodyPhotoPage() {
               <p className="text-sm text-slate-500 mt-2 text-center">Biomechanical markers extracted and stored securely.</p>
             </motion.div>
           ) : (
-            <div className="relative z-0 flex flex-col items-center text-white/40 animate-pulse">
-              <Camera className="h-14 w-14 mb-3" />
-              <p className="text-sm font-semibold tracking-wide">Initializing AI Posture Engine...</p>
+            <div className="relative z-0 flex flex-col items-center text-white/40">
+              {mode === "camera" ? (
+                <div className="flex flex-col items-center animate-pulse">
+                  <Camera className="h-14 w-14 mb-3" />
+                  <p className="text-sm font-semibold tracking-wide">Initializing AI Posture Engine...</p>
+                </div>
+              ) : mode === "upload" ? (
+                <div className="flex flex-col items-center animate-pulse">
+                  <Upload className="h-14 w-14 mb-3" />
+                  <p className="text-sm font-semibold tracking-wide">Analysing your photo...</p>
+                </div>
+              ) : (
+                <p className="text-sm font-semibold tracking-wide">Choose how to capture your posture</p>
+              )}
             </div>
           )}
         </Card>
@@ -177,9 +227,31 @@ export function BodyPhotoPage() {
             <Button variant="outline" onClick={handleRetake} className="h-12 rounded-xl border-black-200 hover:bg-[var(--primary-light)]">Retake Scan</Button>
             <Button onClick={() => navigate("/onboarding/goal-selection")} className="h-12 rounded-xl bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] shadow-lg shadow-green-200">Continue</Button>
           </div>
+        ) : mode === "camera" ? (
+          <div className="grid grid-cols-2 gap-4">
+            <Button variant="outline" onClick={() => setMode("choice")} className="h-12 rounded-xl">Back</Button>
+            <Button onClick={handleCapture} className="h-12 rounded-xl bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] shadow-sm shadow-green-200" isLoading={isAnalyzing}>Capture Pose</Button>
+          </div>
         ) : (
-          <div className="w-full">
-            <Button onClick={handleCapture} className="w-full h-12 rounded-xl bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] shadow-sm shadow-green-200" isLoading={isAnalyzing}>Capture Pose</Button>
+          <div className="grid grid-cols-2 gap-4">
+            <Button onClick={() => setMode("camera")} className="h-12 rounded-xl bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] shadow-sm shadow-green-200">
+              <Camera className="h-4 w-4 mr-2" /> Use Camera
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setMode("upload"); fileInputRef.current?.click(); }}
+              className="h-12 rounded-xl"
+              isLoading={isAnalyzing}
+            >
+              <Upload className="h-4 w-4 mr-2" /> Upload Photo
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
           </div>
         )}
 

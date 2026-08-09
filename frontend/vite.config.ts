@@ -19,6 +19,11 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      // Pre-rendered voice cue wav files are served from Django's MEDIA_ROOT.
+      '/media': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
 });

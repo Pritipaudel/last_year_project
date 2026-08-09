@@ -9,33 +9,39 @@ import { initializeCamera, stopCamera, processPose } from "@/lib/camera_mediapip
 import { createCurlTracker } from "@/lib/curl_tracking";
 import { createTreePoseTracker } from "@/lib/tree_pose_tracking";
 import { createButterflyTracker } from "@/lib/butterfly_tracking";
+import { buildCueAudioIndex, preloadCueAudio, getTTSAudioUrl } from "@/lib/cueAudio";
 
 // ================================================================
 // VISIBILITY HELPERS
 // ================================================================
 
-function isUpperLegVisible(landmarks: any[]): boolean {
+function isSquatFullBodyVisible(landmarks: any[]): boolean {
   if (!landmarks) return false;
-  const leftVis = landmarks[23]?.visibility > 0.5 && landmarks[25]?.visibility > 0.5;
-  const rightVis = landmarks[24]?.visibility > 0.5 && landmarks[26]?.visibility > 0.5;
-  return leftVis || rightVis;
+  // Require Nose (0), Shoulders (11,12), Hips (23,24), Knees (25,26), Ankles (27,28)
+  const req = [0, 11, 12, 23, 24, 25, 26, 27, 28];
+  return req.every(
+    idx => landmarks[idx] && (landmarks[idx].visibility === undefined || landmarks[idx].visibility > 0.45)
+  );
 }
 
-/** Both exercises: person is at least partially in frame. */
+function isCurlBodyVisible(landmarks: any[]): boolean {
+  if (!landmarks) return false;
+  // Require Shoulders (11,12), Elbows (13,14), Wrists (15,16), Hips (23,24)
+  const req = [11, 12, 13, 14, 15, 16, 23, 24];
+  return req.every(
+    idx => landmarks[idx] && (landmarks[idx].visibility === undefined || landmarks[idx].visibility > 0.45)
+  );
+}
+
 function isInFrame(landmarks: any[]): boolean {
-  // Require at least 2 of: nose, left hip, right hip to avoid single-point false positives
   const visible = [0, 23, 24].filter(idx => landmarks[idx] && landmarks[idx].visibility > 0.4);
   return visible.length >= 2;
 }
 
-/**
- * Curl: requires BOTH shoulders + BOTH elbows + BOTH wrists visible.
- * This is the strict bilateral check — if any of the 6 landmarks is missing
- * we cannot reliably track both arms.
- */
 function isBothArmsFullyVisible(landmarks: any[]): boolean {
   return [11, 12, 13, 14, 15, 16].every(idx => landmarks[idx] && landmarks[idx].visibility > 0.5);
 }
+
 
 // ================================================================
 // COMPONENT
@@ -119,10 +125,30 @@ export function ActiveWorkoutPage() {
 
   const treeHoldLeftRef = useRef(0);
   const treeHoldRightRef = useRef(0);
+  // Cue text -> pre-rendered clip URL, and the clip currently playing.
+  const cueAudioIndexRef = useRef<Record<string, string>>({});
+  const cueAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { exerciseRef.current = exercise; }, [exercise]);
-  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
+
+  // Index the seeded cue clips for this exercise and warm the browser cache so
+  // the first cue plays without a network delay.
+  useEffect(() => {
+    const personalization = exercise?.personalization;
+    const index = buildCueAudioIndex(
+      personalization?.voice_cues as unknown as Record<string, string> | undefined,
+      personalization?.voice_cue_audio,
+    );
+    cueAudioIndexRef.current = index;
+    preloadCueAudio(index);
+  }, [exercise]);
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+    if (isMuted) {
+      cueAudioRef.current?.pause();
+    }
+  }, [isMuted]);
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
   useEffect(() => { trackingStatusRef.current = trackingStatus; }, [trackingStatus]);
   useEffect(() => { treeHoldLeftRef.current = treeHoldLeft; }, [treeHoldLeft]);
@@ -133,24 +159,40 @@ export function ActiveWorkoutPage() {
     return () => { document.body.style.overflow = 'auto'; };
   }, []);
 
+  // Plays TTS audio clips for voice feedback (pre-rendered or on-demand TTS).
+  const utter = (text: string, key?: string) => {
+    const previous = cueAudioRef.current;
+    if (previous) {
+      previous.pause();
+      previous.currentTime = 0;
+    }
+
+    const url = getTTSAudioUrl(text, key, cueAudioIndexRef.current);
+    const audio = new Audio(url);
+    cueAudioRef.current = audio;
+    audio.play().catch((e) => {
+      // If play() was interrupted by pause() (e.g. newer cue), ignore.
+      if (e.name === 'AbortError') return;
+      if (cueAudioRef.current === audio) {
+        cueAudioRef.current = null;
+      }
+      console.warn("TTS playback error:", e);
+    });
+  };
+
   const speak = (text: string, key: string, cooldownMs = 4000) => {
     if (isMutedRef.current) return;
     const now = Date.now();
     if (now - (lastSpokeAt.current[key] || 0) < cooldownMs) return;
     lastSpokeAt.current[key] = now;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.05;
-    window.speechSynthesis.speak(u);
+    utter(text, key);
   };
 
-  const speakImmediate = (text: string) => {
+  const speakImmediate = (text: string, key?: string) => {
     if (isMutedRef.current) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.05;
-    window.speechSynthesis.speak(u);
+    utter(text, key);
   };
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -287,12 +329,12 @@ export function ActiveWorkoutPage() {
       }
 
       if (isCurl && curlTrackerRef.current) {
-        const bothArmsVis = isBothArmsFullyVisible(landmarks);
-        if (!bothArmsVis) {
+        const bodyVis = isCurlBodyVisible(landmarks);
+        if (!bodyVis) {
           consecutiveLostFrames.current += 1;
           if (consecutiveLostFrames.current >= LOST_THRESHOLD) {
             setTrackingStatus('lost');
-            speak("Both arms must be visible. Step back.", "curl_lost", 7000);
+            speak("Both arms and torso must be visible. Step back.", "curl_lost", 7000);
           }
           return;
         }
@@ -333,14 +375,14 @@ export function ActiveWorkoutPage() {
       const spineAngle = results.spine_angle;
       const thresholds = ex.personalization.angle_ranges;
       const cues = ex.personalization.voice_cues;
-      const legsVisible = isUpperLegVisible(landmarks);
+      const fullBodyVisible = isSquatFullBodyVisible(landmarks);
 
-      if (!legsVisible) {
+      if (!fullBodyVisible) {
         consecutiveLostFrames.current += 1;
         if (consecutiveLostFrames.current >= LOST_THRESHOLD) {
           if (trackingStatusRef.current !== 'lost') {
             setTrackingStatus('lost');
-            speak("Step back so your full legs are in frame.", "squat_lost", 7000);
+            speak("Step back so your full body is in frame.", "squat_lost", 7000);
           }
           if (repState.current !== 'ready') repState.current = 'ready';
         }
@@ -352,14 +394,22 @@ export function ActiveWorkoutPage() {
       }
 
       if (!hasCalibrated.current) {
-        if (angle !== null && angle > 155) {
+        const isUprightStanding =
+          angle !== null &&
+          angle > 150 &&
+          spineAngle !== null &&
+          spineAngle < 20 &&
+          landmarks[23]?.y < landmarks[25]?.y &&
+          landmarks[25]?.y < landmarks[27]?.y;
+
+        if (isUprightStanding) {
           calibrationFrames.current += 1;
           calibrationAngles.current.push(angle);
         } else {
-          calibrationFrames.current = Math.max(0, calibrationFrames.current - 3);
+          calibrationFrames.current = Math.max(0, calibrationFrames.current - 2);
         }
-        if (calibrationFrames.current >= 25) {
-          const avg = calibrationAngles.current.slice(-25).reduce((a, b) => a + b, 0) / 25;
+        if (calibrationFrames.current >= 30) {
+          const avg = calibrationAngles.current.slice(-30).reduce((a, b) => a + b, 0) / 30;
           calibratedStandingAngle.current = avg;
           hasCalibrated.current = true;
           setTrackingStatus('tracking');
@@ -370,10 +420,10 @@ export function ActiveWorkoutPage() {
 
       if (angle === null) return;
       const standingAngle = calibratedStandingAngle.current!;
-      const descendTrigger = standingAngle - 15;
+      const descendTrigger = standingAngle - 18;
       const completeTrigger = standingAngle - 15;
       const resetTrigger = standingAngle - 6;
-      const bottomMax = (thresholds as any).bottom_max ?? 90;
+      const bottomMax = (thresholds as any).bottom_max ?? 105;
 
       if (repState.current === 'ready') {
         if (angle < descendTrigger) {
@@ -396,7 +446,7 @@ export function ActiveWorkoutPage() {
       } else if (repState.current === 'ascending') {
         if (angle > completeTrigger) {
           if (reachedBottom.current) {
-            if (spineAngle !== null && spineAngle > 25) {
+            if (spineAngle !== null && spineAngle > 30) {
               speakImmediate((cues as any).forward_lean ?? "No rep! Keep your chest up.");
               repState.current = 'waiting_for_top';
             } else {
@@ -413,7 +463,8 @@ export function ActiveWorkoutPage() {
         if (angle > resetTrigger) repState.current = 'ready';
       }
 
-      if (spineAngle !== null && spineAngle < 55) {
+      // Check forward lean ONLY during active squat movement (descending/bottom/ascending)
+      if (spineAngle !== null && spineAngle > 30 && repState.current !== 'ready' && repState.current !== 'waiting_for_top') {
         speak((cues as any).forward_lean || 'Keep your chest up.', 'spine', 8000);
       }
 
@@ -432,7 +483,7 @@ export function ActiveWorkoutPage() {
 
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      cueAudioRef.current?.pause();
       if (videoRef.current) stopCamera(videoRef.current);
     };
   }, []);

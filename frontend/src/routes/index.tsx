@@ -7,6 +7,7 @@ import { AppLayout } from "@/layouts/AppLayout";
 import { OnboardingLayout } from "@/layouts/OnboardingLayout";
 
 // Screens
+import { HomePage } from "@/pages/home/HomePage";
 import { SplashScreen } from "@/pages/onboarding/SplashScreen";
 import { WelcomePage } from "@/pages/onboarding/WelcomePage";
 import { PhysiologicalProfilePage } from "@/pages/onboarding/PhysiologicalProfilePage";
@@ -32,7 +33,7 @@ import { ProfilePage } from "@/pages/profile/ProfilePage";
 export const router = createBrowserRouter([
   {
     path: ROUTES.HOME,
-    element: <Navigate to={ROUTES.WELCOME} replace />,
+    element: <HomePage />,
   },
   
   // Public Entry (Login / Signup)

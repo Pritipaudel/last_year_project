@@ -10,24 +10,28 @@ import { useUIStore } from '@/store/uiStore';
 
 export function PhysiologicalProfilePage() {
   const navigate = useNavigate();
-  const { setFields, ageGroup, sex, height, weight } = useOnboardingStore();
+  const { setFields, ageGroup, sex, feet, inches, height, weight } = useOnboardingStore();
   const { addToast } = useUIStore();
+
+  // Helper to derive feet & inches from height (cm) if feet/inches not directly stored
+  const parsedCm = height ? parseFloat(height) : 0;
+  const totalInchesLoaded = parsedCm > 0 ? Math.round(parsedCm / 2.54) : 0;
+  const defaultFeet = feet || (totalInchesLoaded > 0 ? String(Math.floor(totalInchesLoaded / 12)) : '');
+  const defaultInches = inches || (totalInchesLoaded > 0 ? String(totalInchesLoaded % 12) : '');
 
   const [formData, setFormData] = useState({
     ageGroup: ageGroup || '',
     sex: sex || '',
-    height: height || '',
+    feet: defaultFeet,
+    inches: defaultInches,
     weight: weight || '',
   });
 
-  // Calculate the starting step based on the persisted data
-  const initialStep = (height && weight) ? 3 : sex ? 3 : ageGroup ? 2 : 1;
+  const initialStep = (formData.feet && formData.weight) ? 3 : sex ? 3 : ageGroup ? 2 : 1;
   const [step, setStep] = useState(initialStep);
   const [isSaving, setIsSaving] = useState(false);
 
-
   const ageGroups = [
-    // ... (omitted same content for brevity in instruction, but will include in replacement)
     { value: '18-25', label: '18-25', icon: GraduationCap },
     { value: '26-40', label: '26-40', icon: Briefcase },
     { value: '41-60', label: '41-60', icon: User },
@@ -40,10 +44,25 @@ export function PhysiologicalProfilePage() {
     { value: 'prefer-not-to-say', label: 'Prefer not to say' },
   ];
 
+  // Combine Feet and Inches into total inches, then convert combined value to cm (1 inch = 2.54 cm)
+  const calculateHeightCm = () => {
+    const feetVal = parseFloat(formData.feet || '0');
+    const inchesVal = parseFloat(formData.inches || '0');
+    const safeFeet = !isNaN(feetVal) && feetVal >= 0 ? feetVal : 0;
+    const safeInches = !isNaN(inchesVal) && inchesVal >= 0 ? inchesVal : 0;
+    
+    const combinedTotalInches = (safeFeet * 12) + safeInches;
+    if (combinedTotalInches > 0) {
+      return combinedTotalInches * 2.54;
+    }
+    return null;
+  };
+
   const calculateBMI = () => {
-    const heightM = parseFloat(formData.height) / 100; // cm to m
+    const heightCm = calculateHeightCm();
     const weightKg = parseFloat(formData.weight);
-    if (heightM && weightKg) {
+    if (heightCm && heightCm > 0 && weightKg && weightKg > 0) {
+      const heightM = heightCm / 100;
       return (weightKg / (heightM * heightM)).toFixed(1);
     }
     return null;
@@ -51,31 +70,35 @@ export function PhysiologicalProfilePage() {
 
   const handleContinue = async () => {
     if (step === 1 && formData.ageGroup) {
-      // Persist step 1 selection immediately so it survives remounts
       setFields({ ageGroup: formData.ageGroup });
       setStep(2);
     } else if (step === 2 && formData.sex) {
-      // Persist step 2 selection immediately
       setFields({ sex: formData.sex });
       setStep(3);
-    } else if (step === 3 && formData.height && formData.weight) {
+    } else if (step === 3 && (formData.feet || formData.inches) && formData.weight) {
       setIsSaving(true);
       try {
+        const heightCm = calculateHeightCm();
+        if (!heightCm || heightCm <= 0) {
+          throw new Error("Please enter a valid height in feet and/or inches.");
+        }
         const bmi = calculateBMI();
 
-        // Persist to backend
+        // Persist to backend in combined cm
         await biometricService.saveProfile({
           age_group: formData.ageGroup,
           sex: formData.sex,
-          height: parseFloat(formData.height),
+          height: parseFloat(heightCm.toFixed(2)),
           weight: parseFloat(formData.weight),
-          privacy_consent_timestamp: new Date().toISOString() // Core requirement
+          privacy_consent_timestamp: new Date().toISOString()
         });
 
         setFields({
           ageGroup: formData.ageGroup,
           sex: formData.sex,
-          height: formData.height,
+          feet: formData.feet || '0',
+          inches: formData.inches || '0',
+          height: String(heightCm.toFixed(1)),
           weight: formData.weight,
           bmi,
         });
@@ -84,7 +107,7 @@ export function PhysiologicalProfilePage() {
       } catch (error: any) {
         addToast({
           title: "Setup Error",
-          description: error.response?.data?.message || "Failed to save profile. Please try again.",
+          description: error.message || error.response?.data?.message || "Failed to save profile. Please try again.",
           type: "error"
         });
       } finally {
@@ -96,11 +119,15 @@ export function PhysiologicalProfilePage() {
   const isStepComplete = () => {
     if (step === 1) return !!formData.ageGroup;
     if (step === 2) return !!formData.sex;
-    if (step === 3) return !!formData.height && !!formData.weight;
+    if (step === 3) {
+      const heightCm = calculateHeightCm();
+      return !!heightCm && heightCm > 0 && !!formData.weight && parseFloat(formData.weight) > 0;
+    }
     return false;
   };
 
   const bmi = calculateBMI();
+  const calculatedCm = calculateHeightCm();
 
   return (
     <PageTransition variant="fade" className="flex flex-col max-h-screen bg-[var(--bg-dashboard)]">
@@ -198,7 +225,7 @@ export function PhysiologicalProfilePage() {
             </PageTransition>
           )}
 
-          {/* Step 3: Height & Weight */}
+          {/* Step 3: Height (Feet & Inches) & Weight */}
           {step === 3 && (
             <PageTransition variant="slide" key="step3">
               <h1 className="text-2xl font-bold mb-2 text-foreground">
@@ -209,31 +236,55 @@ export function PhysiologicalProfilePage() {
               </p>
 
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-5">
-                  <div>
-                    <label htmlFor="height" className="block text-sm font-medium mb-1.5">
-                      Height (cm)
-                    </label>
-                    <Input
-                      id="height"
-                      type="number"
-                      placeholder="170"
-                      value={formData.height}
-                      onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                    />
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Height (Feet & Inches)
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Input
+                        id="feet"
+                        type="number"
+                        placeholder="5 ft"
+                        min="1"
+                        max="8"
+                        value={formData.feet}
+                        onChange={(e) => setFormData({ ...formData, feet: e.target.value })}
+                      />
+                      <span className="text-xs text-muted-foreground mt-1 block">Feet (ft)</span>
+                    </div>
+                    <div>
+                      <Input
+                        id="inches"
+                        type="number"
+                        placeholder="2 in"
+                        min="0"
+                        max="11"
+                        value={formData.inches}
+                        onChange={(e) => setFormData({ ...formData, inches: e.target.value })}
+                      />
+                      <span className="text-xs text-muted-foreground mt-1 block">Inches (in)</span>
+                    </div>
                   </div>
-                  <div>
-                    <label htmlFor="weight" className="block text-sm font-medium mb-1.5">
-                      Weight (kg)
-                    </label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      placeholder="70"
-                      value={formData.weight}
-                      onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-                    />
-                  </div>
+                  {calculatedCm !== null && calculatedCm > 0 && (
+                    <div className="mt-2 text-xs font-semibold text-[var(--accent-text)] bg-[var(--accent-surface)] px-3 py-2 rounded-xl border border-[var(--primary-light)]/30 flex items-center justify-between">
+                      <span>Calculated Height:</span>
+                      <span className="text-sm font-bold text-[var(--primary-hover)]">{calculatedCm.toFixed(1)} cm</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="weight" className="block text-sm font-medium mb-1.5">
+                    Weight (kg)
+                  </label>
+                  <Input
+                    id="weight"
+                    type="number"
+                    placeholder="70"
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                  />
                 </div>
 
                 {/* Live BMI Display */}

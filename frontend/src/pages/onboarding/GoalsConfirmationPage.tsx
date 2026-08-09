@@ -20,7 +20,19 @@ const GOAL_LABELS: Record<string, string> = {
 
 export function GoalsConfirmationPage() {
   const navigate = useNavigate();
-  const { ageGroup, sex, height, weight, bmi, selectedGoal, photoTaken, cameraAllowed } = useOnboardingStore();
+  const { ageGroup, feet, inches, height, weight, bmi, selectedGoal, selectedGoals, photoTaken, cameraAllowed } = useOnboardingStore();
+
+  const formattedHeight = feet
+    ? `${feet}' ${inches || 0}" (${height ? Math.round(parseFloat(height)) : ''} cm)`
+    : height ? `${height} cm` : "Not set";
+
+  const goalList = selectedGoals && selectedGoals.length > 0
+    ? selectedGoals
+    : selectedGoal ? selectedGoal.split(',').map(s => s.trim()) : [];
+
+  const formattedGoals = goalList.length > 0
+    ? goalList.map(g => GOAL_LABELS[g] || g).join(', ')
+    : "Not set";
 
   const summaryItems = [
     {
@@ -31,14 +43,14 @@ export function GoalsConfirmationPage() {
     {
       icon: Ruler,
       label: "Measurements",
-      value: height && weight
-        ? `${height}cm / ${weight}kg${bmi ? ` (BMI: ${bmi})` : ""}`
+      value: weight
+        ? `${formattedHeight} / ${weight} kg${bmi ? ` (BMI: ${bmi})` : ""}`
         : "Not set",
     },
     {
       icon: Target,
-      label: "Selected Goal",
-      value: selectedGoal ? (GOAL_LABELS[selectedGoal] || selectedGoal) : "Not set",
+      label: "Selected Goals",
+      value: formattedGoals,
     },
     {
       icon: Camera,

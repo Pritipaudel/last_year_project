@@ -173,7 +173,85 @@ export function processPose(
     // Clear previous results callback to avoid memory leaks/double-firing
     poseInstance.onResults(() => { });
 
-    poseInstance.onResults((results: any) => {
+    poseInstance.onResults(buildFrameHandler(canvasElement, ctx, onResults));
+
+    // @ts-ignore
+    if (window.Camera) {
+        // @ts-ignore
+        cameraInstance = new window.Camera(videoElement, {
+            onFrame: async () => {
+                if (poseInstance) {
+                    await poseInstance.send({ image: videoElement });
+                }
+            },
+            width: 640,
+            height: 480
+        });
+        cameraInstance.start().catch((err: any) => console.error("Camera start error:", err));
+    }
+
+    return () => {
+        stopCamera(videoElement);
+    };
+}
+
+/**
+ * Runs the exact same landmark extraction / angle / EMA / drawing pipeline used by the
+ * live camera loop on a single still image (e.g. a user-uploaded photo).
+ *
+ * Inputs:  imageElement — a fully loaded HTMLImageElement.
+ *          canvasElement — canvas the annotated frame is drawn onto (same size as the live one).
+ * Output:  the same results object shape the live `processPose` callback receives, or null
+ *          if MediaPipe is unavailable or no body was detected in the image.
+ * Assumes: the MediaPipe Pose UMD bundle is already loaded on `window`.
+ */
+export async function processPoseOnImage(
+    imageElement: HTMLImageElement,
+    canvasElement: HTMLCanvasElement
+): Promise<any | null> {
+    const ctx = canvasElement.getContext('2d');
+    // @ts-ignore
+    if (!ctx || !window.Pose) return null;
+
+    // Dedicated single-shot instance: a still frame must not share smoothing/tracking
+    // state with the live session, and it is closed immediately after use.
+    // @ts-ignore
+    const pose = new window.Pose({
+        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+    pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    const detection = await new Promise<any | null>((resolve) => {
+        const handleFrame = buildFrameHandler(canvasElement, ctx, resolve);
+        pose.onResults((results: any) => {
+            if (!results.poseLandmarks) {
+                resolve(null);
+                return;
+            }
+            handleFrame(results);
+        });
+        pose.send({ image: imageElement }).catch(() => resolve(null));
+    });
+
+    try {
+        pose.close();
+    } catch (e) {
+        console.error("Error closing single-shot pose", e);
+    }
+    return detection;
+}
+
+function buildFrameHandler(
+    canvasElement: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D,
+    onResults: (data: any) => void
+) {
+    return (results: any) => {
         if (!ctx) return;
         ctx.save();
         ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
@@ -318,24 +396,5 @@ export function processPose(
             ctx.fillText(`${displayAngle ? Math.round(displayAngle) : '--'}°`, 20, 48);
         }
         ctx.restore();
-    });
-
-    // @ts-ignore
-    if (window.Camera) {
-        // @ts-ignore
-        cameraInstance = new window.Camera(videoElement, {
-            onFrame: async () => {
-                if (poseInstance) {
-                    await poseInstance.send({ image: videoElement });
-                }
-            },
-            width: 640,
-            height: 480
-        });
-        cameraInstance.start().catch((err: any) => console.error("Camera start error:", err));
-    }
-
-    return () => {
-        stopCamera(videoElement);
     };
 }

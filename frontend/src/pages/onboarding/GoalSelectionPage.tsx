@@ -19,21 +19,39 @@ const GOALS = [
 
 export function GoalSelectionPage() {
   const navigate = useNavigate();
-  const { setField } = useOnboardingStore();
-  const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
+  const { setFields, selectedGoals: storeSelectedGoals, selectedGoal: storeSelectedGoal } = useOnboardingStore();
+
+  // Initialize from store (support array or comma-separated string)
+  const initialGoals: string[] = storeSelectedGoals && storeSelectedGoals.length > 0
+    ? storeSelectedGoals
+    : storeSelectedGoal
+      ? storeSelectedGoal.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(initialGoals);
   const [isSaving, setIsSaving] = useState(false);
 
+  const toggleGoal = (id: string) => {
+    setSelectedGoals((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
+    );
+  };
+
   const handleContinue = async () => {
-    if (selectedGoal) {
+    if (selectedGoals.length > 0) {
       setIsSaving(true);
       try {
+        const joinedGoals = selectedGoals.join(", ");
         await biometricService.saveProfile({
-          goal: selectedGoal
+          goal: joinedGoals,
         });
-        setField("selectedGoal", selectedGoal);
+        setFields({
+          selectedGoals,
+          selectedGoal: joinedGoals,
+        });
         navigate("/onboarding/goals-confirmation");
       } catch (e) {
-        console.error("Failed to save goal", e);
+        console.error("Failed to save goals", e);
       } finally {
         setIsSaving(false);
       }
@@ -43,15 +61,15 @@ export function GoalSelectionPage() {
   return (
     <PageTransition variant="slide" className="flex flex-col h-full ">
       <div className="mb-6 text-center">
-        <h2 className="text-2xl font-bold text-foreground mb-2">Select Your Goal</h2>
-        <p className="text-muted-foreground">What is your primary focus right now?</p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Select Your Goals</h2>
+        <p className="text-muted-foreground">Select one or more goals to focus on</p>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="grid gap-3 pb-6">
           {GOALS.map((goal, index) => {
             const Icon = goal.icon;
-            const isSelected = selectedGoal === goal.id;
+            const isSelected = selectedGoals.includes(goal.id);
             const isLocked = goal.isLocked;
             
             return (
@@ -63,7 +81,7 @@ export function GoalSelectionPage() {
               >
                 <Card
                   variant="interactive"
-                  onClick={() => !isLocked && setSelectedGoal(goal.id)}
+                  onClick={() => !isLocked && toggleGoal(goal.id)}
                   className={cn(
                     "p-4 transition-all relative overflow-hidden",
                     isSelected && "ring-1 ring-primary",
@@ -114,11 +132,11 @@ export function GoalSelectionPage() {
         </Button>
         <Button 
           onClick={handleContinue}
-          disabled={!selectedGoal || isSaving}
+          disabled={selectedGoals.length === 0 || isSaving}
           isLoading={isSaving}
           className="h-12 px-6 rounded-full bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] text-white font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
         >
-          <span>Complete Setup</span>
+          <span>Complete Setup ({selectedGoals.length})</span>
           <Check size={16} strokeWidth={2.5}></Check>
         </Button>
       </div>

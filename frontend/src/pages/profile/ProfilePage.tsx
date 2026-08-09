@@ -72,7 +72,14 @@ export function ProfilePage() {
             </div>
             <div>
               <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Height</div>
-              <div className="font-medium">{profile.height ? `${profile.height} cm` : "-"}</div>
+              <div className="font-medium">
+                {profile.height ? (() => {
+                  const totalInches = Math.round(parseFloat(String(profile.height)) / 2.54);
+                  const ft = Math.floor(totalInches / 12);
+                  const inc = totalInches % 12;
+                  return `${ft}' ${inc}" (${profile.height} cm)`;
+                })() : "-"}
+              </div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Weight</div>
@@ -83,8 +90,8 @@ export function ProfilePage() {
               <div className="font-medium">{profile.bmi || "-"}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Primary Goal</div>
-              <div className="font-medium capitalize">{profile.goal ? profile.goal.replace('_', ' ') : "-"}</div>
+              <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Goals</div>
+              <div className="font-medium capitalize">{profile.goal ? profile.goal.split(',').map(g => g.trim().replace(/[-_]/g, ' ')).join(', ') : "-"}</div>
             </div>
           </div>
         </div>

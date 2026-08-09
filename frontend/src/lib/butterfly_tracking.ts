@@ -41,8 +41,12 @@ export function createButterflyTracker(
 
   return {
     processFrame(lm: any[], now: number): TreePoseResult {
-      // 1. Visibility phase: relax to just shoulders and hips, don't require nose 
-      const torsoOk = vis(lm[11]) && vis(lm[12]) && (vis(lm[23]) || vis(lm[24]));
+      // 1. Visibility phase
+      const torsoOk =
+        vis(lm[11], 0.45) &&
+        vis(lm[12], 0.45) &&
+        vis(lm[23], 0.45) &&
+        vis(lm[24], 0.45);
 
       if (!torsoOk) {
         if (lastPhase !== 'invisible') {
@@ -156,13 +160,22 @@ export function createButterflyTracker(
 
       // Fire feedback
       if (goodBalance) {
-        if (errors.length === 0) {
-          speak('Perfect! Keep holding.', 'butterfly_perfect', 10000);
+        if (errors.length === 0 && accumulated >= 3.0) {
+          speak('Perfect! Keep holding.', 'butterfly_perfect', 15000);
         }
       } else {
+const DEFAULT_BUTTERFLY_CUES: Record<string, string> = {
+  spine_rounded: "Sit up straight and lengthen your spine.",
+  shoulders_raised: "Relax your shoulders down away from your ears.",
+  knees_too_high: "Lower your knees toward the floor.",
+  feet_apart: "Bring the soles of your feet together.",
+  head_dropped: "Keep your gaze forward and head up.",
+};
+
         for (const key of config.voice_cue_priority) {
-          if (errors.includes(key) && config.voice_cues[key]) {
-            speak(config.voice_cues[key], `err_${key}`, CD);
+          if (errors.includes(key)) {
+            const cueText = config.voice_cues[key] || DEFAULT_BUTTERFLY_CUES[key] || "Adjust your posture.";
+            speak(cueText, `err_${key}`, CD);
             fireError(key, "both", getTimestamp());
             break;
           }

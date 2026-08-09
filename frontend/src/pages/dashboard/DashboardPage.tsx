@@ -19,14 +19,24 @@ export function DashboardPage() {
   const [recentSessions, setRecentSessions] = useState<WorkoutSession[]>([]);
   const [todayExercise, setTodayExercise] = useState<Exercise | null>(null);
 
-  const [currentGoal, setCurrentGoal] = useState<string>("");
+  const CATEGORIES = [
+    { id: "build-muscle", label: "Build Muscle" },
+    { id: "lose-weight", label: "Lose Weight" },
+    { id: "stay-active", label: "Stay Active" },
+    { id: "improve-flexibility", label: "Flexibility" },
+    { id: "doctor-rehab", label: "Rehab" },
+  ];
+
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [isUpdatingGoal, setIsUpdatingGoal] = useState(false);
+
   const todayDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
     year: 'numeric'
   });
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -39,9 +49,9 @@ export function DashboardPage() {
         setExercises(exData);
         setRecentSessions(sessionData);
         if (profileData && profileData.goal) {
-          setCurrentGoal(profileData.goal);
+          const parsed = profileData.goal.split(',').map(s => s.trim()).filter(Boolean);
+          setSelectedGoals(parsed);
         }
-        // Pick Squat as "Today's Plan" if available, otherwise first exercise
         const squat = exData.find(ex => ex.name.toLowerCase().includes('squat'));
         setTodayExercise(squat || exData[0] || null);
 
@@ -53,6 +63,25 @@ export function DashboardPage() {
     };
     fetchData();
   }, []);
+
+  const toggleCategory = async (catId: string) => {
+    if (isUpdatingGoal) return;
+    const updated = selectedGoals.includes(catId)
+      ? selectedGoals.filter(c => c !== catId)
+      : [...selectedGoals, catId];
+
+    setSelectedGoals(updated);
+    setIsUpdatingGoal(true);
+    try {
+      await biometricService.updateProfile({ goal: updated.join(', ') });
+      const data = await exerciseService.getExercises();
+      setExercises(data || []);
+    } catch (e) {
+      console.error("Failed to update goals", e);
+    } finally {
+      setIsUpdatingGoal(false);
+    }
+  };
 
   if (isLoading) {
     return <LoadingSpinner fullScreen label="Loading dashboard..." />;
@@ -105,35 +134,33 @@ export function DashboardPage() {
             </p>
           </div>
         </Card>
-        <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6 flex flex-col justify-center text-center">
-          <span className="text-[12px] font-bold uppercase text-[var(--text-muted)] mt-0.5 ">Current Category</span>
-          <div className="relative w-full bg-[var(--bg-canvas)] border border-[var(--border-card)] mt-2 rounded-xl px-4 py-2.5 flex items-center justify-between group hover:border-[var(--primary-light)] transition-colors ">
-            <select title="Fitness Goal" value={currentGoal} onChange={async (e) => {
-              const newGoal = e.target.value;
-              setCurrentGoal(newGoal);
-              setIsUpdatingGoal(true);
-              try {
-                await biometricService.updateProfile({ goal: newGoal });
-                const data = await exerciseService.getExercises();
-                setExercises(data || []);
-              } catch (e) {
-                console.error("Failed to update goal");
-              } finally {
-                setIsUpdatingGoal(false);
-              }
-            }}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-              disabled={isUpdatingGoal}>
-              <option value="weight_gain">Weight Gain</option>
-              <option value="weight_loss">Weight Loss</option>
-              <option value="stay_active">Stay Active</option>
-              <option value="flexibility">Flexibility</option>
-              <option value="rehabilitation">Doctor Recommendation(Rehab)</option>
-            </select>
-            <span className="text-sm font-bold text-[var(--primary-hover)] capitalize">
-              {currentGoal.replace('_', ' ')}
+        <Card className="bg-white border-[var(--border-card)] shadow-sm rounded-2xl p-6 flex flex-col justify-between text-left">
+          <div>
+            <span className="text-[11px] font-bold uppercase text-[var(--text-muted)] tracking-wider block mb-2">
+              Target Categories ({selectedGoals.length})
             </span>
-            <ChevronDown size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition-colors" />
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORIES.map((cat) => {
+                const isSelected = selectedGoals.includes(cat.id);
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleCategory(cat.id)}
+                    disabled={isUpdatingGoal}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1"
+                    style={{
+                      borderColor: isSelected ? 'var(--primary-solid)' : 'var(--border-card)',
+                      background: isSelected ? 'var(--accent-surface)' : 'var(--bg-canvas)',
+                      color: isSelected ? 'var(--primary-hover)' : 'var(--text-muted)',
+                      fontWeight: isSelected ? 700 : 500,
+                    }}
+                  >
+                    <span>{cat.label}</span>
+                    {isSelected && <span className="text-[10px]">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </Card>
       </div>

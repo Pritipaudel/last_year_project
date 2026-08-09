@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Info, Dumbbell } from "lucide-react";
+import { Info, Dumbbell, PlayCircle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -9,13 +9,15 @@ import { exerciseService, Exercise } from "@/services/exerciseService";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 
 // -----------------------------------------------------------------------
-// Per-exercise instructions, safety cues, and camera position hints.
+// Per-exercise instructions, safety cues, video tutorial embed, and camera position hints.
 // Keyed on a lowercase substring of the exercise name.
 // -----------------------------------------------------------------------
 interface ExerciseGuide {
   safetyTip: string;
   steps: string[];
   cameraTip: string;
+  videoEmbedUrl?: string;
+  isShort?: boolean;
 }
 
 function getExerciseGuide(exerciseName: string): ExerciseGuide {
@@ -31,6 +33,8 @@ function getExerciseGuide(exerciseName: string): ExerciseGuide {
         "Push through your heels to stand back up.",
       ],
       cameraTip: "Camera at hip height, 1.5 m away — full body in frame.",
+      videoEmbedUrl: "https://www.youtube.com/embed/YaXPRqUwItQ?start=33",
+      isShort: false,
     };
   }
 
@@ -44,6 +48,8 @@ function getExerciseGuide(exerciseName: string): ExerciseGuide {
         "Slowly lower back down — fully extend each time.",
       ],
       cameraTip: "Stand 1–1.5 m from camera — both arms must be visible.",
+      videoEmbedUrl: "https://www.youtube.com/embed/iui51E31sX8",
+      isShort: true,
     };
   }
 
@@ -58,6 +64,8 @@ function getExerciseGuide(exerciseName: string): ExerciseGuide {
         "Fix your gaze on one spot. Hold, then switch legs.",
       ],
       cameraTip: "Camera at chest height, 1.5 m away — full body visible.",
+      videoEmbedUrl: "https://www.youtube.com/embed/0g3lN6XpWrQ",
+      isShort: true,
     };
   }
 
@@ -71,6 +79,8 @@ function getExerciseGuide(exerciseName: string): ExerciseGuide {
         "Let your knees fall naturally. Breathe and hold.",
       ],
       cameraTip: "Camera at floor level, 1 m away — torso and legs visible.",
+      videoEmbedUrl: "https://www.youtube.com/embed/gj-Zx0wPjjA",
+      isShort: false,
     };
   }
 
@@ -113,16 +123,16 @@ export function ExercisePreviewPage() {
   const guide = getExerciseGuide(exercise.name);
 
   return (
-    <PageTransition variant="slide" className="flex flex-col min-h-screen">
+    <PageTransition variant="slide" className="flex flex-col min-h-screen pb-12">
       <Header title="Exercise Detail" showBack onBack={() => navigate(-1)} />
 
       <div className="flex-1 overflow-y-auto">
-        {/* Hero image — no video overlay */}
+        {/* Hero image */}
         <div
           className="h-64 w-full bg-cover bg-center relative"
           style={{ backgroundImage: `url(${exercise.imageUrl})` }}
         >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
           <div className="absolute bottom-4 left-4 flex gap-2">
             <Badge variant="secondary">{exercise.difficulty}</Badge>
             <Badge variant="outline" className="text-white border-white/50">
@@ -131,26 +141,26 @@ export function ExercisePreviewPage() {
           </div>
         </div>
 
-        <div className="p-4 sm:p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
           {/* Title */}
           <h2 className="text-3xl font-bold">{exercise.name}</h2>
 
           {/* Safety tip */}
-          <div className="bg-[var(--primary-solid)]/10 rounded-xl p-4 flex gap-3 text-sm">
+          <div className="bg-[var(--primary-solid)]/10 border border-[var(--primary-solid)]/20 rounded-xl p-4 flex gap-3 text-sm">
             <Info className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-            <p className="text-[var(--text-main)]/80">{guide.safetyTip}</p>
+            <p className="text-[var(--text-main)]/90 font-medium">{guide.safetyTip}</p>
           </div>
 
           {/* Step-by-step instructions */}
           <div className="space-y-3">
-            <h3 className="font-semibold text-lg">How to Perform</h3>
+            <h3 className="font-bold text-lg text-foreground">Step-by-Step Instructions</h3>
             <ol className="space-y-3">
               {guide.steps.map((step, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <span className="flex-shrink-0 h-6 w-6 rounded-full bg-[var(--primary-solid)] text-white text-xs font-bold flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
-                  <span className="text-[var(--text-muted)] text-sm leading-relaxed">
+                  <span className="text-[var(--text-main)]/80 text-sm leading-relaxed font-medium">
                     {step}
                   </span>
                 </li>
@@ -158,19 +168,40 @@ export function ExercisePreviewPage() {
             </ol>
           </div>
 
+          {/* Video Tutorial Iframe */}
+          {guide.videoEmbedUrl && (
+            <div className="space-y-3 pt-2">
+              <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                <PlayCircle className="h-5 w-5 text-[var(--primary-solid)]" />
+                <span>Video Demonstration</span>
+              </h3>
+              <div className="w-full flex justify-center bg-black/5 dark:bg-white/5 rounded-2xl p-2 sm:p-3 overflow-hidden border border-border shadow-inner">
+                <div className={guide.isShort ? "w-full max-w-xs aspect-[9/16]" : "w-full aspect-video"}>
+                  <iframe
+                    src={guide.videoEmbedUrl}
+                    title={`${exercise.name} Tutorial Video`}
+                    className="w-full h-full rounded-xl border-0 shadow-md"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Camera position tip */}
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex gap-3 text-sm">
             <Dumbbell className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-amber-700 dark:text-amber-300 mb-0.5">
-                Camera Position
+              <p className="font-semibold text-amber-800 dark:text-amber-300 mb-0.5">
+                Optimal Camera Position
               </p>
-              <p className="text-amber-700/80 dark:text-amber-400/80">{guide.cameraTip}</p>
+              <p className="text-amber-700/90 dark:text-amber-400/90 font-medium">{guide.cameraTip}</p>
             </div>
           </div>
 
           <Button
-            className="w-full"
+            className="w-full py-4 text-base font-bold rounded-xl bg-[var(--primary-solid)] hover:bg-[var(--primary-hover)] shadow-lg"
             size="lg"
             onClick={() => navigate(`/workout/active?id=${exercise.id}`)}
           >

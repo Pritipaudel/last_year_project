@@ -4,12 +4,15 @@ import { persist } from "zustand/middleware";
 export interface OnboardingData {
   ageGroup: string;
   sex: string;
+  feet: string;
+  inches: string;
   height: string;
   weight: string;
   bmi: string | null;
   cameraAllowed: boolean | null;
   photoTaken: boolean;
   selectedGoal: string | null;
+  selectedGoals: string[];
 }
 
 interface OnboardingState extends OnboardingData {
@@ -21,12 +24,15 @@ interface OnboardingState extends OnboardingData {
 const initialState: OnboardingData = {
   ageGroup: "",
   sex: "",
+  feet: "",
+  inches: "",
   height: "",
   weight: "",
   bmi: null,
   cameraAllowed: null,
   photoTaken: false,
   selectedGoal: null,
+  selectedGoals: [],
 };
 
 export const useOnboardingStore = create<OnboardingState>()(

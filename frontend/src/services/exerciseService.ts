@@ -63,6 +63,11 @@ export interface ExercisePersonalization {
   hold_config?: any;
   postural_flags?: any;
   voice_cues: VoiceCues;
+  /**
+   * Pre-rendered TTS clip URL per cue key, sharing keys with `voice_cues`.
+   * Only seeded cues appear here; anything missing falls back to Web Speech.
+   */
+  voice_cue_audio?: Record<string, string>;
   voice_cue_priority: string[];
   cue_cooldown_seconds: number;
   user_name?: string;
