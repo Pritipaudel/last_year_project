@@ -71,19 +71,19 @@ export function createButterflyTracker(
       // 2. Seated phase check
       // Only require at least one knee to be visible.
       const kneesVis = vis(lm[25], 0.3) || vis(lm[26], 0.3);
-
+      
       const lHipY = lm[23]?.y || lm[24]?.y || 0;
       const rHipY = lm[24]?.y || lm[23]?.y || 0;
       const hipMidY = (lHipY + rHipY) / 2;
-
+      
       let kneeY = hipMidY;
       if (vis(lm[25]) && vis(lm[26])) kneeY = (lm[25].y + lm[26].y) / 2;
       else if (vis(lm[25])) kneeY = lm[25].y;
       else if (vis(lm[26])) kneeY = lm[26].y;
-
+      
       // We expect knee to not be aggressively higher than hips for seated
-      const isSeated = kneeY > hipMidY - 0.2;
-
+      const isSeated = kneeY > hipMidY - 0.2; 
+      
       if (!isSeated || !kneesVis) {
         if (lastPhase !== 'standing') {
           lastPhase = 'standing';
@@ -111,15 +111,12 @@ export function createButterflyTracker(
       const shoulderMidY = (lm[11].y + lm[12].y) / 2;
       const torsoH = Math.abs(hipMidY - shoulderMidY) || 0.001;
       const shoulderW = Math.abs(lm[11].x - lm[12].x) || 0.001;
-
+      
       // A. Trunk lean / spine rounded
       // Normal torso height is ~1.5x shoulder width. If we see much less, they are leaning forward.
       const expectedTorsoH = shoulderW * 1.5;
       const leanRatio = 1 - (torsoH / expectedTorsoH);
-
-      // Give a generous buffer (+0.1) so users with less flexibility can still pass
-      const relaxedLeanMax = (T.trunk_lean_max ?? 0.18) + 0.15;
-      if (leanRatio > relaxedLeanMax) {
+      if (leanRatio > T.trunk_lean_max) {
         errors.push('spine_rounded');
       }
 
@@ -127,7 +124,7 @@ export function createButterflyTracker(
       if (vis(lm[0], 0.5)) {
         const noseY = lm[0].y;
         const shoulderToNose = shoulderMidY - noseY;
-
+        
         if (shoulderToNose < T.shoulder_elevation_threshold * expectedTorsoH) {
           errors.push('shoulders_raised');
         }
@@ -137,21 +134,13 @@ export function createButterflyTracker(
       }
 
       // D. Knees too high
-      // When sitting on floor in butterfly pose, knees should open outward (wide) and drop DOWN.
-      // We measure knee Y relative to SHOULDER midpoint because hip-to-knee ratio is unstable
-      // (hips and knees are very close in Y when seated flat on the floor).
-      // A good butterfly pose: knees are well below shoulder midpoint.
-      // Bad butterfly: knees pulled UP toward chest (y < shoulderMidY + 0.15*torsoH).
       if (vis(lm[25]) && vis(lm[26])) {
-        const lKneeY = lm[25].y;
-        const rKneeY = lm[26].y;
-        const avgKneeY = (lKneeY + rKneeY) / 2;
+        // Drop ratio measured as fraction of torso height to be distance-invariant
+        const leftDrop = (lm[25].y - lm[23].y) / torsoH;
+        const rightDrop = (lm[26].y - lm[24].y) / torsoH;
+        const avgDrop = (leftDrop + rightDrop) / 2;
 
-        // Knee must be at least 15% of torso height BELOW the shoulder midpoint in image coords.
-        // This is a very generous threshold — even a beginner's knees should comfortably clear this
-        // when seated upright. If knees are raised to chest level they won't pass this check.
-        const kneeToShoulderRatio = (avgKneeY - shoulderMidY) / torsoH;
-        if (kneeToShoulderRatio < 0.15) {
+        if (avgDrop < T.knee_drop_ratio_min) {
           errors.push('knees_too_high');
         }
       }
@@ -165,8 +154,8 @@ export function createButterflyTracker(
         }
       }
 
-      // knees_too_high is a critical error — if you're not even seated in butterfly, don't tick timer.
-      const criticalErrors = errors.filter((e) => ['spine_rounded', 'knees_too_high'].includes(e));
+
+      const criticalErrors = errors.filter((e) => ['spine_rounded', 'shoulders_raised', 'knees_too_high'].includes(e));
       const goodBalance = criticalErrors.length === 0;
 
       // Fire feedback
