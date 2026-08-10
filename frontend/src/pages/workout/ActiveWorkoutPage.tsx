@@ -125,9 +125,6 @@ export function ActiveWorkoutPage() {
 
   const treeHoldLeftRef = useRef(0);
   const treeHoldRightRef = useRef(0);
-  // Cue text -> pre-rendered clip URL, and the clip currently playing.
-  const cueAudioIndexRef = useRef<Record<string, string>>({});
-  const cueAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { exerciseRef.current = exercise; }, [exercise]);
@@ -306,7 +303,7 @@ export function ActiveWorkoutPage() {
           consecutiveLostFrames.current = 0;
         }
 
-        if (result.isComplete && !isPausedRef.current) {
+        if (result.isComplete && !isPausedRef.current && !isFinishingRef.current) {
           handleFinish();
           return;
         }
@@ -495,7 +492,9 @@ export function ActiveWorkoutPage() {
   };
 
   const handleFinish = async () => {
-    if (!exercise) return;
+    if (!exercise || isFinishingRef.current) return;
+    isFinishingRef.current = true;
+
     speakImmediate("Workout complete. Well done!");
     if (videoRef.current) stopCamera(videoRef.current);
 
@@ -667,14 +666,12 @@ export function ActiveWorkoutPage() {
           <div className="w-full h-full relative">
             <canvas ref={canvasRef} className="w-full h-full object-cover" width={640} height={480} />
             <div className="absolute inset-x-0 bottom-32 flex justify-center px-6 pointer-events-none">
-              <div className={`px-8 py-3 bg-black/85 rounded-full border transition-all duration-300 flex items-center gap-3 shadow-xl backdrop-blur-md ${
-                trackingStatus === 'tracking' 
-                  ? 'border-emerald-500/30 opacity-0' 
+              <div className={`px-8 py-3 bg-black/85 rounded-full border transition-all duration-300 flex items-center gap-3 shadow-xl backdrop-blur-md ${trackingStatus === 'tracking'
+                  ? 'border-emerald-500/30 opacity-0'
                   : 'border-amber-500/40 opacity-100'
-              }`}>
-                <div className={`h-2.5 w-2.5 rounded-full animate-pulse ${
-                  trackingStatus === 'lost' ? 'bg-red-500' : 'bg-amber-400'
-                }`} />
+                }`}>
+                <div className={`h-2.5 w-2.5 rounded-full animate-pulse ${trackingStatus === 'lost' ? 'bg-red-500' : 'bg-amber-400'
+                  }`} />
                 <p className="text-xs font-extrabold text-white uppercase tracking-widest notranslate">
                   {trackingStatus === 'lost' ? 'STEP BACK INTO FRAME' : 'CALIBRATING POSE'}
                 </p>

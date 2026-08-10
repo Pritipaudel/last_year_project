@@ -1,0 +1,78 @@
+{
+  "cues": {
+    "60+": {
+      "feet_apart": "Gently bring your feet together when you feel comfortable.",
+      "head_dropped": "Softly raise your head and look ahead of you.",
+      "spine_rounded": "Take a breath in and slowly sit a little taller \u2014 no rush.",
+      "knees_too_high": "Take your time \u2014 breathe out and let your knees slowly relax.",
+      "shoulders_raised": "Gently let your shoulders melt down. You are doing well."
+    },
+    "18-25": {
+      "feet_apart": "Bring the soles of your feet together \u2014 press them firmly.",
+      "head_dropped": "Lift your chin \u2014 keep your gaze forward.",
+      "spine_rounded": "Sit tall \u2014 lengthen your spine and lift your chest.",
+      "knees_too_high": "Relax your hips and let your knees drop lower.",
+      "shoulders_raised": "Drop your shoulders away from your ears. Relax your upper body."
+    },
+    "26-40": {
+      "feet_apart": "Bring the soles of your feet together \u2014 press them firmly.",
+      "head_dropped": "Lift your chin \u2014 keep your gaze forward.",
+      "spine_rounded": "Sit tall \u2014 lengthen your spine and lift your chest.",
+      "knees_too_high": "Relax your hips and let your knees drop lower.",
+      "shoulders_raised": "Drop your shoulders away from your ears. Relax your upper body."
+    },
+    "41-60": {
+      "feet_apart": "Try to bring your feet a little closer together.",
+      "head_dropped": "Gently bring your chin level with the floor.",
+      "spine_rounded": "Gently lift through the crown of your head and straighten your back.",
+      "knees_too_high": "Gently allow your knees to soften downward toward the floor.",
+      "shoulders_raised": "Soften your shoulders downward and breathe out."
+    }
+  },
+  "angles": {
+    "60+": {
+      "trunk_lean_max": 0.25,
+      "min_hold_frames": 3,
+      "head_drop_threshold": 0.12,
+      "knee_drop_ratio_min": 0.0,
+      "feet_apart_threshold": 0.2,
+      "forward_head_threshold": 0.12,
+      "knee_drop_ratio_high_warning": 0.5,
+      "shoulder_elevation_threshold": 0.07,
+      "wrist_height_symmetry_threshold": null
+    },
+    "18-25": {
+      "trunk_lean_max": 0.18,
+      "min_hold_frames": 5,
+      "head_drop_threshold": 0.08,
+      "knee_drop_ratio_min": 0.1,
+      "feet_apart_threshold": 0.15,
+      "forward_head_threshold": 0.08,
+      "knee_drop_ratio_high_warning": 0.25,
+      "shoulder_elevation_threshold": 0.05,
+      "wrist_height_symmetry_threshold": null
+    },
+    "26-40": {
+      "trunk_lean_max": 0.18,
+      "min_hold_frames": 5,
+      "head_drop_threshold": 0.08,
+      "knee_drop_ratio_min": 0.05,
+      "feet_apart_threshold": 0.15,
+      "forward_head_threshold": 0.08,
+      "knee_drop_ratio_high_warning": 0.3,
+      "shoulder_elevation_threshold": 0.05,
+      "wrist_height_symmetry_threshold": null
+    },
+    "41-60": {
+      "trunk_lean_max": 0.22,
+      "min_hold_frames": 4,
+      "head_drop_threshold": 0.1,
+      "knee_drop_ratio_min": 0.0,
+      "feet_apart_threshold": 0.18,
+      "forward_head_threshold": 0.1,
+      "knee_drop_ratio_high_warning": 0.4,
+      "shoulder_elevation_threshold": 0.06,
+      "wrist_height_symmetry_threshold": null
+    }
+  }
+}
