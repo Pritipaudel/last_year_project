@@ -65,25 +65,26 @@ export function createButterflyTracker(
           leftLeg: { isHolding: false, holdSeconds: accumulated, isComplete: accumulated >= H.target_hold_seconds },
           rightLeg: { isHolding: false, holdSeconds: 0, isComplete: true },
           isComplete: accumulated >= H.target_hold_seconds,
+          currentErrors: [],
         };
       }
 
       // 2. Seated phase check
       // Only require at least one knee to be visible.
       const kneesVis = vis(lm[25], 0.3) || vis(lm[26], 0.3);
-      
+
       const lHipY = lm[23]?.y || lm[24]?.y || 0;
       const rHipY = lm[24]?.y || lm[23]?.y || 0;
       const hipMidY = (lHipY + rHipY) / 2;
-      
+
       let kneeY = hipMidY;
       if (vis(lm[25]) && vis(lm[26])) kneeY = (lm[25].y + lm[26].y) / 2;
       else if (vis(lm[25])) kneeY = lm[25].y;
       else if (vis(lm[26])) kneeY = lm[26].y;
-      
+
       // We expect knee to not be aggressively higher than hips for seated
-      const isSeated = kneeY > hipMidY - 0.2; 
-      
+      const isSeated = kneeY > hipMidY - 0.2;
+
       if (!isSeated || !kneesVis) {
         if (lastPhase !== 'standing') {
           lastPhase = 'standing';
@@ -101,6 +102,7 @@ export function createButterflyTracker(
           leftLeg: { isHolding: false, holdSeconds: accumulated, isComplete: accumulated >= H.target_hold_seconds },
           rightLeg: { isHolding: false, holdSeconds: 0, isComplete: true },
           isComplete: accumulated >= H.target_hold_seconds,
+          currentErrors: [],
         };
       }
 
@@ -111,7 +113,7 @@ export function createButterflyTracker(
       const shoulderMidY = (lm[11].y + lm[12].y) / 2;
       const torsoH = Math.abs(hipMidY - shoulderMidY) || 0.001;
       const shoulderW = Math.abs(lm[11].x - lm[12].x) || 0.001;
-      
+
       // A. Trunk lean / spine rounded
       // Normal torso height is ~1.5x shoulder width. If we see much less, they are leaning forward.
       const expectedTorsoH = shoulderW * 1.5;
@@ -124,7 +126,7 @@ export function createButterflyTracker(
       if (vis(lm[0], 0.5)) {
         const noseY = lm[0].y;
         const shoulderToNose = shoulderMidY - noseY;
-        
+
         if (shoulderToNose < T.shoulder_elevation_threshold * expectedTorsoH) {
           errors.push('shoulders_raised');
         }
@@ -164,13 +166,13 @@ export function createButterflyTracker(
           speak('Perfect! Keep holding.', 'butterfly_perfect', 15000);
         }
       } else {
-const DEFAULT_BUTTERFLY_CUES: Record<string, string> = {
-  spine_rounded: "Sit up straight and lengthen your spine.",
-  shoulders_raised: "Relax your shoulders down away from your ears.",
-  knees_too_high: "Lower your knees toward the floor.",
-  feet_apart: "Bring the soles of your feet together.",
-  head_dropped: "Keep your gaze forward and head up.",
-};
+        const DEFAULT_BUTTERFLY_CUES: Record<string, string> = {
+          spine_rounded: "Sit up straight and lengthen your spine.",
+          shoulders_raised: "Relax your shoulders down away from your ears.",
+          knees_too_high: "Lower your knees toward the floor.",
+          feet_apart: "Bring the soles of your feet together.",
+          head_dropped: "Keep your gaze forward and head up.",
+        };
 
         for (const key of config.voice_cue_priority) {
           if (errors.includes(key)) {
@@ -239,6 +241,7 @@ const DEFAULT_BUTTERFLY_CUES: Record<string, string> = {
         leftLeg: { isHolding, holdSeconds: accumulated, isComplete },
         rightLeg: { isHolding: false, holdSeconds: 0, isComplete: true },
         isComplete,
+        currentErrors: errors,
       };
     },
 

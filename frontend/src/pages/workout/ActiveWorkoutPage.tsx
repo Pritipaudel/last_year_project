@@ -63,6 +63,11 @@ export function ActiveWorkoutPage() {
   const [reps, setReps] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Posture quality — computed each frame from angle thresholds
+  type PostureQuality = { status: 'good' | 'check'; message: string } | null;
+  const [postureQuality, setPostureQuality] = useState<PostureQuality>(null);
+  const postureQualityRef = useRef<PostureQuality>(null);
+
   // Curl-specific: bilateral rep display
   const [repsLeft, setRepsLeft] = useState(0);
   const [repsRight, setRepsRight] = useState(0);
@@ -311,6 +316,31 @@ export function ActiveWorkoutPage() {
           return;
         }
 
+        // --- Posture quality for static hold ---
+        let staticPosture: PostureQuality = null;
+        if (result.phase === 'active' && result.currentErrors && result.currentErrors.length > 0) {
+          const err = result.currentErrors[0];
+          const msgMap: Record<string, string> = {
+            'knee_bent': 'STRAIGHTEN KNEE',
+            'hip_unlevel': 'LEVEL HIPS',
+            'trunk_sway': 'KEEP TORSO STILL',
+            'foot_too_low': 'RAISE FOOT',
+            'spine_rounded': 'SIT UP STRAIGHT',
+            'shoulders_raised': 'RELAX SHOULDERS',
+            'knees_too_high': 'LOWER KNEES',
+            'feet_apart': 'FEET TOGETHER',
+            'head_dropped': 'HEAD UP'
+          };
+          staticPosture = { status: 'check', message: (err && msgMap[err]) ? msgMap[err] : 'ADJUST POSTURE' };
+        } else if (result.phase === 'active' || result.phase === 'complete') {
+          staticPosture = { status: 'good', message: 'GOOD FORM' };
+        }
+
+        if (staticPosture?.message !== postureQualityRef.current?.message || staticPosture?.status !== postureQualityRef.current?.status) {
+          postureQualityRef.current = staticPosture;
+          setPostureQuality(staticPosture);
+        }
+
         const now = Date.now();
         if (now - lastUiUpdateAt.current > 100) {
           setTreeHoldLeft(result.leftLeg.holdSeconds);
@@ -344,7 +374,7 @@ export function ActiveWorkoutPage() {
         consecutiveLostFrames.current = 0;
 
         const tracker = curlTrackerRef.current;
-        const { leftReps, rightReps, totalReps } = tracker.processFrame(results);
+        const { leftReps, rightReps, totalReps, leftAngle, rightAngle, currentIssues } = tracker.processFrame(results);
 
         if (!tracker.bothCalibrated()) {
           if (Date.now() - lastUiUpdateAt.current > 100) {
@@ -358,6 +388,35 @@ export function ActiveWorkoutPage() {
           hasCalibrated.current = true;
           setTrackingStatus('tracking');
           speakImmediate("Perfect, let's start! Begin your first curl.");
+        }
+
+        // --- Posture quality for curl ---
+        let curlPosture: PostureQuality = { status: 'good', message: 'GOOD FORM' };
+        if (currentIssues && currentIssues.length > 0) {
+          const err = currentIssues[0];
+          const msgMap: Record<string, string> = {
+            'body_swing': 'KEEP TORSO STILL',
+            'elbow_swing': 'LOCK ELBOWS',
+            'shoulder_elevation': 'RELAX SHOULDERS',
+            'insufficient_curl': 'CURL HIGHER',
+            'incomplete_extension': 'STRAIGHTEN ARM'
+          };
+          curlPosture = { status: 'check', message: (err && msgMap[err]) ? msgMap[err] : 'ADJUST POSTURE' };
+        } else {
+          // Fallback to absolute threshold if no active specific error
+          const t = (ex.personalization?.angle_ranges ?? {}) as any;
+          const extThresh = t.extended_threshold ?? 150;
+          const peakMin = t.peak_min ?? 30;
+          const leftGood = leftAngle == null || (leftAngle >= peakMin && leftAngle <= extThresh);
+          const rightGood = rightAngle == null || (rightAngle >= peakMin && rightAngle <= extThresh);
+          if (!leftGood || !rightGood) {
+            curlPosture = { status: 'check', message: 'CHECK ANGLE' };
+          }
+        }
+
+        if (curlPosture.message !== postureQualityRef.current?.message || curlPosture.status !== postureQualityRef.current?.status) {
+          postureQualityRef.current = curlPosture;
+          setPostureQuality(curlPosture);
         }
 
         const now = Date.now();
@@ -419,11 +478,32 @@ export function ActiveWorkoutPage() {
       }
 
       if (angle === null) return;
-      const standingAngle = calibratedStandingAngle.current!;
-      const descendTrigger = standingAngle - 18;
-      const completeTrigger = standingAngle - 15;
-      const resetTrigger = standingAngle - 6;
-      const bottomMax = (thresholds as any).bottom_max ?? 105;
+
+      // --- Posture quality for squat ---
+      {
+        let squatPosture: PostureQuality = { status: 'good', message: 'GOOD FORM' };
+        // We evaluate form only when relatively active, not standing at the top
+        if (repState.current !== 'ready') {
+          if (spineAngle !== null && spineAngle > 30) {
+            squatPosture = { status: 'check', message: 'KEEP CHEST UP' };
+          } else {
+            const bottomMax = (thresholds as any).bottom_max ?? 105;
+            if (angle < bottomMax) {
+              squatPosture = { status: 'check', message: 'TOO DEEP' };
+            }
+          }
+        }
+
+        if (squatPosture.message !== postureQualityRef.current?.message || squatPosture.status !== postureQualityRef.current?.status) {
+          postureQualityRef.current = squatPosture;
+          setPostureQuality(squatPosture);
+        }
+      }
+      const standingAngle2 = calibratedStandingAngle.current!;
+      const descendTrigger = standingAngle2 - 18;
+      const completeTrigger = standingAngle2 - 15;
+      const resetTrigger = standingAngle2 - 6;
+      const bottomMax2 = (thresholds as any).bottom_max ?? 105;
 
       if (repState.current === 'ready') {
         if (angle < descendTrigger) {
@@ -433,7 +513,7 @@ export function ActiveWorkoutPage() {
         }
       } else if (repState.current === 'descending') {
         if (angle < minAngleInRep.current) minAngleInRep.current = angle;
-        if (angle < bottomMax) {
+        if (angle < bottomMax2) {
           repState.current = 'bottom';
           reachedBottom.current = true;
           speakImmediate("Good depth!");
@@ -666,15 +746,29 @@ export function ActiveWorkoutPage() {
         ) : (
           <div className="w-full h-full relative">
             <canvas ref={canvasRef} className="w-full h-full object-cover" width={640} height={480} />
+
+            {/* Posture quality badge — shown when actively tracking */}
+            {trackingStatus === 'tracking' && postureQuality && (
+              <div className="absolute bottom-36 left-4 z-[115] pointer-events-none">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md shadow-lg transition-all duration-300 ${postureQuality.status === 'good'
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                  }`}>
+                  <span className={`h-2 w-2 rounded-full ${postureQuality.status === 'good' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                    }`} />
+                  {postureQuality.message}
+                </div>
+              </div>
+            )}
+
+            {/* Calibrating / lost overlay pill */}
             <div className="absolute inset-x-0 bottom-32 flex justify-center px-6 pointer-events-none">
-              <div className={`px-8 py-3 bg-black/85 rounded-full border transition-all duration-300 flex items-center gap-3 shadow-xl backdrop-blur-md ${
-                trackingStatus === 'tracking' 
-                  ? 'border-emerald-500/30 opacity-0' 
-                  : 'border-amber-500/40 opacity-100'
-              }`}>
-                <div className={`h-2.5 w-2.5 rounded-full animate-pulse ${
-                  trackingStatus === 'lost' ? 'bg-red-500' : 'bg-amber-400'
-                }`} />
+              <div className={`px-8 py-3 bg-black/85 rounded-full border transition-all duration-300 flex items-center gap-3 shadow-xl backdrop-blur-md ${trackingStatus === 'tracking'
+                ? 'border-emerald-500/30 opacity-0'
+                : 'border-amber-500/40 opacity-100'
+                }`}>
+                <div className={`h-2.5 w-2.5 rounded-full animate-pulse ${trackingStatus === 'lost' ? 'bg-red-500' : 'bg-amber-400'
+                  }`} />
                 <p className="text-xs font-extrabold text-white uppercase tracking-widest notranslate">
                   {trackingStatus === 'lost' ? 'STEP BACK INTO FRAME' : 'CALIBRATING POSE'}
                 </p>

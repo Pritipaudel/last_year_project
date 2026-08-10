@@ -50,6 +50,9 @@ export interface CurlFrameResult {
     leftReps: number;
     rightReps: number;
     totalReps: number;   // min(leftReps, rightReps) — the bilateral rep count
+    leftAngle: number | null;   // live EMA-smoothed elbow angle, left arm
+    rightAngle: number | null;  // live EMA-smoothed elbow angle, right arm
+    currentIssues: string[]; // live form errors detected in the current rep
 }
 
 // State machine for one arm
@@ -94,6 +97,11 @@ export function createCurlTracker(
     let trunkSwingWarned = false;
 
     const errorCounts: Record<string, number> = {};
+    const activeIssues = new Set<string>();
+
+    // Live angle storage — updated each frame so getAngles() can read them
+    let currentLeftAngle: number | null = null;
+    let currentRightAngle: number | null = null;
 
     // ------------------------------------------------------------------
     // Per-arm state machine
@@ -145,6 +153,7 @@ export function createCurlTracker(
                 arm.invalidRep = false;
                 trunkSwingWarned = false;
                 trunkAngleAtRepStart = null;
+                activeIssues.clear();
             }
         }
 
@@ -356,6 +365,10 @@ export function createCurlTracker(
             const leftShoulderY = landmark_left_shoulder?.y ?? null;
             const rightShoulderY = landmark_right_shoulder?.y ?? null;
 
+            // Store live angles for external consumers (UI overlay)
+            currentLeftAngle = elbow_angle_left ?? null;
+            currentRightAngle = elbow_angle_right ?? null;
+
             processArm(left, elbow_angle_left, leftElbowX, leftShoulderY, 'left');
             processArm(right, elbow_angle_right, rightElbowX, rightShoulderY, 'right');
 
@@ -376,6 +389,9 @@ export function createCurlTracker(
                 leftReps: left.reps,
                 rightReps: right.reps,
                 totalReps: Math.min(left.reps, right.reps),
+                leftAngle: currentLeftAngle,
+                rightAngle: currentRightAngle,
+                currentIssues: Array.from(activeIssues),
             };
         },
 

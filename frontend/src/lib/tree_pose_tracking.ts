@@ -32,9 +32,10 @@ export type TreePhase = 'invisible' | 'standing' | 'active' | 'complete';
 export interface TreePoseResult {
   phase: TreePhase;
   activeLeg: 'left' | 'right' | null;
-  leftLeg:  { isHolding: boolean; holdSeconds: number; isComplete: boolean };
+  leftLeg: { isHolding: boolean; holdSeconds: number; isComplete: boolean };
   rightLeg: { isHolding: boolean; holdSeconds: number; isComplete: boolean };
   isComplete: boolean;
+  currentErrors: string[];
 }
 
 export interface TreePoseConfig {
@@ -108,7 +109,7 @@ export function createTreePoseTracker(
   const H = config.hold_config;
   const CD = config.cue_cooldown_seconds * 1000;
 
-  const left  = freshLeg();
+  const left = freshLeg();
   const right = freshLeg();
 
   // Phase-level state & debouncing counters
@@ -169,8 +170,8 @@ export function createTreePoseTracker(
         if (gap > (H.grace_period_seconds || 3.0) && !s.graceWarned) {
           s.graceWarned = true;
           s.accumulated = 0;
-          s.lastGoodAt  = 0;
-          s.everHeld    = false;
+          s.lastGoodAt = 0;
+          s.everHeld = false;
           speak(
             `Balance lost on ${legLabel} leg. Timer reset.`,
             `tree_grace_${legLabel}`,
@@ -187,12 +188,12 @@ export function createTreePoseTracker(
     processFrame(lm: any[], now: number): TreePoseResult {
 
       // ── 1. Visibility phase (requires head, shoulders, hips, knees, BOTH ankles) ──
-      const headOk      = vis(lm[0], 0.35);
+      const headOk = vis(lm[0], 0.35);
       const shouldersOk = vis(lm[11], 0.35) && vis(lm[12], 0.35);
-      const hipsOk      = vis(lm[23], 0.35) && vis(lm[24], 0.35);
-      const kneesOk     = vis(lm[25], 0.35) && vis(lm[26], 0.35);
-      const anklesOk    = vis(lm[27], 0.30) && vis(lm[28], 0.30);
-      const fullBodyOk  = headOk && shouldersOk && hipsOk && kneesOk && anklesOk;
+      const hipsOk = vis(lm[23], 0.35) && vis(lm[24], 0.35);
+      const kneesOk = vis(lm[25], 0.35) && vis(lm[26], 0.35);
+      const anklesOk = vis(lm[27], 0.30) && vis(lm[28], 0.30);
+      const fullBodyOk = headOk && shouldersOk && hipsOk && kneesOk && anklesOk;
 
       if (!fullBodyOk) {
         consecutiveInvisibleFrames++;
@@ -212,9 +213,9 @@ export function createTreePoseTracker(
               6000,
             );
           }
-          return buildResult(left, right, null, 'invisible', H.target_hold_seconds);
+          return buildResult(left, right, null, 'invisible', H.target_hold_seconds, []);
         }
-        return buildResult(left, right, null, lastPhase, H.target_hold_seconds);
+        return buildResult(left, right, null, lastPhase, H.target_hold_seconds, []);
       } else {
         consecutiveInvisibleFrames = 0;
         consecutiveVisibleFrames++;
@@ -224,17 +225,17 @@ export function createTreePoseTracker(
       if (lastPhase === 'invisible' && consecutiveVisibleFrames < 6) {
         pauseLeg(left);
         pauseLeg(right);
-        return buildResult(left, right, null, 'invisible', H.target_hold_seconds);
+        return buildResult(left, right, null, 'invisible', H.target_hold_seconds, []);
       }
 
       // ── 2. Determine Tree Pose leg stance (distinguish from walking/standing) ────────
-      const lKneeY  = lm[25]?.y ?? 0.5;
-      const rKneeY  = lm[26]?.y ?? 0.5;
+      const lKneeY = lm[25]?.y ?? 0.5;
+      const rKneeY = lm[26]?.y ?? 0.5;
       const lAnkleY = lm[27]?.y ?? 0.5;
       const rAnkleY = lm[28]?.y ?? 0.5;
 
-      const lKneeX  = lm[25]?.x ?? 0.5;
-      const rKneeX  = lm[26]?.x ?? 0.5;
+      const lKneeX = lm[25]?.x ?? 0.5;
+      const rKneeX = lm[26]?.x ?? 0.5;
       const lAnkleX = lm[27]?.x ?? 0.5;
       const rAnkleX = lm[28]?.x ?? 0.5;
 
@@ -243,14 +244,14 @@ export function createTreePoseTracker(
       // B) Raised ankle placed close to standing leg line horizontally (< 0.18)
       // C) Raised knee flared outward sideways (> 0.08)
       const lAnkleElevated = (rAnkleY - lAnkleY > 0.05);
-      const lAnkleNearLeg  = Math.abs(lAnkleX - rKneeX) < 0.18 || lAnkleY < rKneeY + 0.10;
-      const lKneeFlared    = Math.abs(lKneeX - rKneeX) > 0.08 || lKneeY < rKneeY - 0.02;
+      const lAnkleNearLeg = Math.abs(lAnkleX - rKneeX) < 0.18 || lAnkleY < rKneeY + 0.10;
+      const lKneeFlared = Math.abs(lKneeX - rKneeX) > 0.08 || lKneeY < rKneeY - 0.02;
 
       const rAnkleElevated = (lAnkleY - rAnkleY > 0.05);
-      const rAnkleNearLeg  = Math.abs(rAnkleX - lKneeX) < 0.18 || rAnkleY < lKneeY + 0.10;
-      const rKneeFlared    = Math.abs(rKneeX - lKneeX) > 0.08 || rKneeY < lKneeY - 0.02;
+      const rAnkleNearLeg = Math.abs(rAnkleX - lKneeX) < 0.18 || rAnkleY < lKneeY + 0.10;
+      const rKneeFlared = Math.abs(rKneeX - lKneeX) > 0.08 || rKneeY < lKneeY - 0.02;
 
-      const isLeftTreeStance  = lAnkleElevated && lAnkleNearLeg && lKneeFlared;
+      const isLeftTreeStance = lAnkleElevated && lAnkleNearLeg && lKneeFlared;
       const isRightTreeStance = rAnkleElevated && rAnkleNearLeg && rKneeFlared;
 
       let detectedStance: 'left' | 'right' | null = null;
@@ -299,9 +300,9 @@ export function createTreePoseTracker(
           pauseLeg(left);
           pauseLeg(right);
           lastActiveLeg = null;
-          return buildResult(left, right, null, 'standing', H.target_hold_seconds);
+          return buildResult(left, right, null, 'standing', H.target_hold_seconds, []);
         }
-        return buildResult(left, right, null, lastPhase, H.target_hold_seconds);
+        return buildResult(left, right, null, lastPhase, H.target_hold_seconds, []);
       } else {
         consecutiveStandingFrames = 0;
       }
@@ -333,10 +334,10 @@ export function createTreePoseTracker(
 
       // Standing-side landmarks
       const ss = currentLeg === 'left' ? 'right' : 'left';   // standing side
-      const sHipIdx    = ss === 'left' ? 23 : 24;
-      const sKneeIdx   = ss === 'left' ? 25 : 26;
-      const sAnkleIdx  = ss === 'left' ? 27 : 28;
-      const rAnkleIdx  = currentLeg === 'left' ? 27 : 28;   // raised-leg ankle
+      const sHipIdx = ss === 'left' ? 23 : 24;
+      const sKneeIdx = ss === 'left' ? 25 : 26;
+      const sAnkleIdx = ss === 'left' ? 27 : 28;
+      const rAnkleIdx = currentLeg === 'left' ? 27 : 28;   // raised-leg ankle
 
       // A. Standing knee angle
       if (vis(lm[sHipIdx]) && vis(lm[sKneeIdx]) && vis(lm[sAnkleIdx])) {
@@ -349,7 +350,7 @@ export function createTreePoseTracker(
       // B. Hip levelness
       if (vis(lm[23]) && vis(lm[24])) {
         const hipDiff = Math.abs(lm[23].y - lm[24].y);
-        const torsoH  = Math.abs((lm[11].y - lm[23].y)) || 0.001;
+        const torsoH = Math.abs((lm[11].y - lm[23].y)) || 0.001;
         if (hipDiff / torsoH > 0.40) errors.push('hip_unlevel');
       }
 
@@ -402,19 +403,19 @@ export function createTreePoseTracker(
       tickLeg(activeState, goodBalance, now, currentLeg);
 
       // Check completion
-      const leftDone  = left.accumulated  >= H.target_hold_seconds;
+      const leftDone = left.accumulated >= H.target_hold_seconds;
       const rightDone = right.accumulated >= H.target_hold_seconds;
       const phase: TreePhase = leftDone && rightDone ? 'complete' : 'active';
 
-      return buildResult(left, right, activeLeg, phase, H.target_hold_seconds);
+      return buildResult(left, right, activeLeg, phase, H.target_hold_seconds, errors);
     },
 
     getErrors: () => [],
 
     reset() {
-      Object.assign(left,  freshLeg());
+      Object.assign(left, freshLeg());
       Object.assign(right, freshLeg());
-      lastPhase    = 'invisible';
+      lastPhase = 'invisible';
       lastActiveLeg = null;
     },
   };
@@ -430,12 +431,14 @@ function buildResult(
   activeLeg: 'left' | 'right' | null,
   phase: TreePhase,
   target: number,
+  errors: string[],
 ): TreePoseResult {
   return {
     phase,
     activeLeg,
-    leftLeg:  { isHolding: l.isHolding, holdSeconds: l.accumulated,  isComplete: l.accumulated  >= target },
+    leftLeg: { isHolding: l.isHolding, holdSeconds: l.accumulated, isComplete: l.accumulated >= target },
     rightLeg: { isHolding: r.isHolding, holdSeconds: r.accumulated, isComplete: r.accumulated >= target },
     isComplete: l.accumulated >= target && r.accumulated >= target,
+    currentErrors: errors,
   };
 }

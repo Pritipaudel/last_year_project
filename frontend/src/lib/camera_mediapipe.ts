@@ -377,23 +377,62 @@ function buildFrameHandler(
                 window.drawLandmarks(ctx, landmarks, { color: '#3b82f6', lineWidth: 1, radius: 2 });
             }
 
-            // PERFORMANCE HUD: Draw angle to Canvas (bypass React render lag)
-            // Show whichever angle is most relevant (elbow if available, else knee)
-            const displayAngle = elbowAngleLeft ?? elbowAngleRight ?? kneeAngle;
-            const displayLabel = (elbowAngleLeft !== null || elbowAngleRight !== null) ? "ELBOW" : "KNEE";
-            const hudColor = displayAngle && displayAngle < 100 ? "#fbbf24" : "#ffffff";
+            // ---- AT-LANDMARK ANGLE LABELS ----
+            // Draws the angle number directly on the joint so the user sees it
+            // at exactly the right body part. Uses normalised MediaPipe coords
+            // (0–1) scaled to canvas pixel dimensions.
 
-            ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-            ctx.fillRect(10, 10, 140, 45);
-            ctx.strokeStyle = "#3b82f6";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(10, 10, 140, 45);
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 14px Arial";
-            ctx.fillText(`LIVE ${displayLabel}`, 20, 28);
-            ctx.fillStyle = hudColor;
-            ctx.font = "bold 20px Courier New";
-            ctx.fillText(`${displayAngle ? Math.round(displayAngle) : '--'}°`, 20, 48);
+            function drawAngleLabel(
+                landmark: any,
+                angle: number | null,
+                color: string
+            ) {
+                if (!landmark || angle === null) return;
+                const px = landmark.x * canvasElement.width;
+                const py = landmark.y * canvasElement.height;
+
+                const text = `${Math.round(angle)}°`;
+                const radius = 18;
+
+                ctx.save();
+                ctx.globalAlpha = 0.8;
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.beginPath();
+                ctx.arc(px, py, radius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(px, py, radius, 0, 2 * Math.PI);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10px \'Courier New\', monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, px, py);
+                ctx.restore();
+            }
+
+            // Decide which joints to annotate based on what’s visible.
+            // Elbow angles present => this is a curl session.
+            // Knee angle present   => squat or lower-body session.
+            const hasCurl = smoothElbowLeft !== null || smoothElbowRight !== null;
+            const hasKnee = smoothKneeAngle !== null;
+
+            if (hasCurl) {
+                // Left elbow: landmark 13
+                drawAngleLabel(landmarks[13], smoothElbowLeft, '#60a5fa');
+                // Right elbow: landmark 14
+                drawAngleLabel(landmarks[14], smoothElbowRight, '#a78bfa');
+            } else if (hasKnee) {
+                // Left knee: landmark 25, Right knee: landmark 26
+                // Show on both knees using the averaged angle
+                drawAngleLabel(landmarks[25], smoothKneeAngle, '#34d399');
+                drawAngleLabel(landmarks[26], smoothKneeAngle, '#34d399');
+            }
         }
         ctx.restore();
     };
