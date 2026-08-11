@@ -11,8 +11,8 @@ export function ProtectedRoute() {
     return <Navigate to="/welcome" state={{ from: location }} replace />;
   }
 
-  // FORCE ONBOARDING: If authenticated but onboarding is incomplete, send to where they left off
-  if (user?.onboardingComplete === false && !location.pathname.startsWith('/onboarding')) {
+  // FORCE ONBOARDING: If authenticated but onboarding is incomplete, send to where they left off. Admins are exempt.
+  if (!user?.isAdmin && (user?.onboarding_complete === false || (user as any)?.onboardingComplete === false) && !location.pathname.startsWith('/onboarding')) {
     let redirectPath = "/onboarding/physiological-profile";
 
     // Determine the furthest incomplete step

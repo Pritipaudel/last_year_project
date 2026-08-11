@@ -41,10 +41,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     onboarding_complete = serializers.SerializerMethodField()
+    isAdmin = serializers.BooleanField(source='is_staff', read_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'onboarding_complete')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'onboarding_complete', 'isAdmin')
 
     def get_onboarding_complete(self, obj):
         # Check if user has a biometric profile and at least one postural assessment

@@ -14,6 +14,12 @@ import { authService, biometricService } from '@/lib/api';
 import { useOnboardingStore } from '@/store/onboardingStore';
 
 const loginSchema = z.object({
+  email: z.string().min(1, "Please enter your email or username."),
+  password: z.string().min(1, "Please enter your password."),
+});
+
+const signupSchema = z.object({
+  fullName: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Please enter a valid email address."),
   password: z.string()
     .min(8, "Password must be at least 8 characters.")
@@ -21,10 +27,6 @@ const loginSchema = z.object({
     .regex(/[a-z]/, "Password must contain a lowercase letter.")
     .regex(/[0-9]/, "Password must contain a number.")
     .regex(/[!@#$%^&*()_+\-=\[\]{};:'".,<>?/\\|`~]/, "Password must contain a special character."),
-});
-
-const signupSchema = loginSchema.extend({
-  fullName: z.string().min(2, "Name must be at least 2 characters."),
 });
 
 type FormValues = z.infer<typeof signupSchema>;
@@ -65,7 +67,9 @@ export function WelcomePage() {
         const store = useOnboardingStore.getState();
         store.reset();
 
-        if (response.user.onboardingComplete === false) {
+        if (response.user.isAdmin) {
+          navigate('/admin/doctors');
+        } else if (response.user.onboarding_complete === false || (response.user as any).onboardingComplete === false) {
           // Fetch profile from backend to know where they left off
           try {
             const profile = await biometricService.getProfile();
@@ -254,10 +258,10 @@ export function WelcomePage() {
 
             {/* EMAIL FIELD */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Email Address</label>
+              <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">Email or Username</label>
               <Input
                 {...form.register("email")}
-                placeholder="e.g. john@example.com"
+                placeholder={isLogin ? "e.g. john@example.com or admin" : "e.g. john@example.com"}
                 leftIcon={<Mail size={18} className="text-[var(--text-muted)]" />}
                 error={form.formState.errors.email?.message}
               />

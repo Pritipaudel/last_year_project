@@ -49,7 +49,8 @@ export const authService = {
             data.user = {
                 ...data.user,
                 name: data.user.first_name || data.user.username,
-                onboardingComplete: data.user.onboarding_complete
+                onboardingComplete: data.user.onboarding_complete,
+                isAdmin: data.user.isAdmin ?? false,
             };
         }
         return data;

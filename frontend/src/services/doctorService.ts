@@ -6,10 +6,13 @@ export interface DoctorProfile {
   specialty: string;
   rating: number;
   distance: string;
+  distanceKm?: number;
   imageUrl: string; // Will map snake_case image_url
   bio: string;
   experience: number;
   hospital: string;
+  address?: string;
+  phone?: string;
   isAvailable: boolean;
   patientsCount: number;
   responseTime: string;
@@ -54,10 +57,13 @@ const mapDoctor = (data: any): DoctorProfile => ({
   specialty: data.specialty,
   rating: Number(data.rating),
   distance: data.distance,
+  distanceKm: data.distanceKm,
   imageUrl: data.image_url,
   bio: data.bio,
   experience: data.experience,
   hospital: data.hospital,
+  address: data.address,
+  phone: data.phone,
   isAvailable: data.is_available,
   patientsCount: data.patients_count,
   responseTime: data.response_time,
@@ -92,6 +98,13 @@ export const doctorService = {
     if (specialty && specialty !== "All") params.specialty = specialty;
     if (search) params.search = search;
     const response = await api.get("/doctors/", { params });
+    return response.data.map(mapDoctor);
+  },
+
+  async getNearbyDoctors(lat: number, lng: number, limit: number = 10): Promise<DoctorProfile[]> {
+    const response = await api.get("/doctors/nearby/", {
+      params: { lat, lng, limit },
+    });
     return response.data.map(mapDoctor);
   },
 

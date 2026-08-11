@@ -7,10 +7,6 @@ export const ROUTES = {
   ACTIVE_WORKOUT: "/workout/active",
   SESSION_SUMMARY: "/workout/summary",
   DOCTORS: "/doctors",
-  DOCTOR_DETAIL: (id: string | number) => `/doctors/${id}`,
-  DOCTOR_BOOK: (id: string | number) => `/doctors/${id}/book`,
-  DOCTOR_CHAT: (id: string | number) => `/doctors/${id}/chat`,
-  DOCTOR_CALL: (id: string | number) => `/doctors/${id}/call`,
   HISTORY: "/history",
   PROFILE: "/profile",
 

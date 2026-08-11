@@ -3,11 +3,12 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 export interface User {
   id: string;
-  name: string;
+  username: string;
   email: string;
-  role?: string;
-  avatar?: string;
-  onboardingComplete?: boolean;
+  first_name?: string;
+  last_name?: string;
+  onboarding_complete?: boolean;
+  isAdmin?: boolean;
 }
 
 interface AuthState {
