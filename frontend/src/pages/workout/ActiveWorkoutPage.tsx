@@ -8,7 +8,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { initializeCamera, stopCamera, processPose } from "@/lib/camera_mediapipe";
 import { createCurlTracker } from "@/lib/curl_tracking";
 import { createTreePoseTracker } from "@/lib/tree_pose_tracking";
-import { createButterflyTracker } from "@/lib/butterfly_tracking";
+import { createButterflyPoseTracker } from "@/lib/butterfly_pose_tracking";
 import { buildCueAudioIndex, preloadCueAudio, getTTSAudioUrl } from "@/lib/cueAudio";
 
 // ================================================================
@@ -89,7 +89,7 @@ export function ActiveWorkoutPage() {
   // ---- TRACKER REFS ----
   const curlTrackerRef = useRef<ReturnType<typeof createCurlTracker> | null>(null);
   const treeTrackerRef = useRef<ReturnType<typeof createTreePoseTracker> | null>(null);
-  const butterflyTrackerRef = useRef<ReturnType<typeof createButterflyTracker> | null>(null);
+  const butterflyTrackerRef = useRef<ReturnType<typeof createButterflyPoseTracker> | null>(null);
 
   // Voice cooldown management (used by all engines)
   const lastSpokeAt = useRef<Record<string, number>>({});
@@ -258,7 +258,7 @@ export function ActiveWorkoutPage() {
       const isButterfly = exercise.name.toLowerCase().includes('butterfly') || exercise.name.toLowerCase().includes('baddha');
 
       if (isButterfly && !butterflyTrackerRef.current) {
-        butterflyTrackerRef.current = createButterflyTracker(
+        butterflyTrackerRef.current = createButterflyPoseTracker(
           p as any,
           speak,
           (type: string, _leg: string, ts: number) => {
@@ -351,7 +351,8 @@ export function ActiveWorkoutPage() {
               ? result.leftLeg.isHolding
               : result.activeLeg === 'right'
                 ? result.rightLeg.isHolding
-                : false,
+                // Butterfly tracks both legs at once, so both must be holding.
+                : result.leftLeg.isHolding && result.rightLeg.isHolding,
           );
           lastUiUpdateAt.current = now;
         }

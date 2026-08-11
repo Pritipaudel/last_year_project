@@ -5,7 +5,11 @@ export function PublicRoute() {
   const { isAuthenticated, user } = useAuth();
 
   if (isAuthenticated) {
-    if (user?.onboardingComplete === false) {
+    // Admins skip the onboarding flow entirely.
+    if (user?.isAdmin) {
+      return <Navigate to="/admin/doctors" replace />;
+    }
+    if (user?.onboarding_complete === false) {
       return <Navigate to="/onboarding/physiological-profile" replace />;
     }
     return <Navigate to="/dashboard" replace />;

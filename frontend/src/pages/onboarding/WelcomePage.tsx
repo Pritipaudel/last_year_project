@@ -69,7 +69,7 @@ export function WelcomePage() {
 
         if (response.user.isAdmin) {
           navigate('/admin/doctors');
-        } else if (response.user.onboarding_complete === false || (response.user as any).onboardingComplete === false) {
+        } else if (response.user.onboarding_complete === false) {
           // Fetch profile from backend to know where they left off
           try {
             const profile = await biometricService.getProfile();

@@ -12,7 +12,7 @@ export function ProtectedRoute() {
   }
 
   // FORCE ONBOARDING: If authenticated but onboarding is incomplete, send to where they left off. Admins are exempt.
-  if (!user?.isAdmin && (user?.onboarding_complete === false || (user as any)?.onboardingComplete === false) && !location.pathname.startsWith('/onboarding')) {
+  if (!user?.isAdmin && user?.onboarding_complete === false && !location.pathname.startsWith('/onboarding')) {
     let redirectPath = "/onboarding/physiological-profile";
 
     // Determine the furthest incomplete step

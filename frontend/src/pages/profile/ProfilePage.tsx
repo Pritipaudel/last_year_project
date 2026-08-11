@@ -155,7 +155,7 @@ export function ProfilePage() {
                   // Wait for delete, then reset local auth state and navigate to welcome which will redirect to setup
                   const authStore = (await import("@/store/authStore")).useAuthStore.getState();
                   if (authStore.user) {
-                    authStore.setUser({ ...authStore.user, onboardingComplete: false });
+                    authStore.setUser({ ...authStore.user, onboarding_complete: false });
                   }
                   window.location.href = "/onboarding/physiological-profile";
                 } catch (e) {
