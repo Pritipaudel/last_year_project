@@ -13,7 +13,7 @@ export const authService = {
     // Stub implementation for now
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return {
-      user: { id: "1", name: "Jane Doe", email: credentials.email, onboardingComplete: true },
+      user: { id: "1", username: "janedoe", name: "Jane Doe", email: credentials.email, onboarding_complete: true },
       token: "mock-jwt-token-12345",
     };
   },
@@ -22,7 +22,7 @@ export const authService = {
     // Stub implementation
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return {
-      user: { id: "1", name: userData.name, email: userData.email, onboardingComplete: false },
+      user: { id: "1", username: userData.name, name: userData.name, email: userData.email, onboarding_complete: false },
       token: "mock-jwt-token-12345",
     };
   },

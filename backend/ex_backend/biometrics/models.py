@@ -28,6 +28,11 @@ class BiometricProfile(models.Model):
     
     goal = models.CharField(max_length=100, null=True, blank=True)
     privacy_consent_timestamp = models.DateTimeField(null=True, blank=True)
+    onboarding_complete = models.BooleanField(
+        default=False,
+        help_text="Set when the user finishes the onboarding flow. Explicitly recorded rather than "
+                  "inferred from assessments, so users who skip the body scan are not looped back.",
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

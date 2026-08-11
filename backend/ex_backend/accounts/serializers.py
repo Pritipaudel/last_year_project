@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+from biometrics.models import BiometricProfile
 from .validators import PasswordStrengthValidator
 
 
@@ -48,9 +49,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'onboarding_complete', 'isAdmin')
 
     def get_onboarding_complete(self, obj):
-        # Check if user has a biometric profile and at least one postural assessment
+        # Read the flag the onboarding flow explicitly sets; absent profile means not started.
         try:
-            profile = obj.biometric_profile
-            return profile.assessments.exists()
-        except:
+            return obj.biometric_profile.onboarding_complete
+        except BiometricProfile.DoesNotExist:
             return False

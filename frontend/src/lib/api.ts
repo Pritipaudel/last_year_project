@@ -44,12 +44,11 @@ export const authService = {
         if (data.access) {
             sessionStorage.setItem('token', data.access);
         }
-        // Map backend snake_case to frontend camelCase
         if (data.user) {
             data.user = {
                 ...data.user,
                 name: data.user.first_name || data.user.username,
-                onboardingComplete: data.user.onboarding_complete,
+                onboarding_complete: data.user.onboarding_complete ?? false,
                 isAdmin: data.user.isAdmin ?? false,
             };
         }
@@ -67,6 +66,7 @@ export const biometricService = {
         return data;
     },
     saveProfile: (profileData: any) => api.patch('biometrics/profile/', profileData),
+    completeOnboarding: () => api.patch('biometrics/profile/', { onboarding_complete: true }),
     deleteProfile: () => api.delete('biometrics/profile/'),
     submitAssessment: (assessmentData: any) => {
         // If data is FormData (for image uploads), axial headers are handled automatically

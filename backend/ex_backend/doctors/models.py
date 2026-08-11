@@ -6,7 +6,7 @@ class DoctorProfile(models.Model):
     specialty = models.CharField(max_length=100)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.00)
     distance = models.CharField(max_length=50, default="1.0 km")
-    image_url = models.TextField(help_text="URL or Base64 data of doctor avatar image")
+    image_url = models.TextField(blank=True, default="", help_text="URL or Base64 data of doctor avatar image")
     bio = models.TextField(blank=True, default="")
     experience = models.IntegerField(default=5, help_text="Years of experience")
     hospital = models.CharField(max_length=100, default="City Medical Center")

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { useOnboardingStore } from "@/store/onboardingStore";
 import { useUIStore } from "@/store/uiStore";
 import { useAuth } from "@/hooks/useAuth";
+import { biometricService } from "@/lib/api";
 
 // Confetti particle component
 function ConfettiParticle({ delay, x, color }: { delay: number; x: number; color: string }) {
@@ -36,19 +38,36 @@ export function OnboardingCompletePage() {
   const { reset } = useOnboardingStore();
   const { addToast } = useUIStore();
   const { user, setUser } = useAuth();
+  const [isFinishing, setIsFinishing] = useState(false);
 
-  const handleStart = () => {
-    if (user) {
-      setUser({ ...user, onboardingComplete: true });
+  const handleStart = async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+    try {
+      // Persist completion before touching local state: if this fails the user keeps their
+      // resume data and stays on this page rather than bouncing back to step one.
+      await biometricService.completeOnboarding();
+
+      if (user) {
+        setUser({ ...user, onboarding_complete: true });
+      }
+
+      addToast({
+        title: "Setup Complete!",
+        description: "Your personalized dashboard is ready.",
+        type: "success",
+      });
+      navigate("/dashboard");
+      reset();
+    } catch (e) {
+      console.error("Failed to complete onboarding", e);
+      addToast({
+        title: "Couldn't finish setup",
+        description: "Please check your connection and try again.",
+        type: "error",
+      });
+      setIsFinishing(false);
     }
-    
-    addToast({
-      title: "Setup Complete!",
-      description: "Your personalized dashboard is ready.",
-      type: "success",
-    });
-    reset();
-    navigate("/dashboard");
   };
 
   // Generate confetti particles
@@ -144,6 +163,8 @@ export function OnboardingCompletePage() {
         >
           <Button
             onClick={handleStart}
+            disabled={isFinishing}
+            isLoading={isFinishing}
             className="h-14 px-10 text-base rounded-full"
             rightIcon={<ArrowRight size={18} />}
           >

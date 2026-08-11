@@ -27,7 +27,7 @@ export function SplashScreen() {
 
     const navTimer = setTimeout(() => {
       if (isAuthenticated) {
-        if (user?.onboardingComplete === false) {
+        if (user?.onboarding_complete === false) {
           navigate("/onboarding/physiological-profile");
         } else {
           navigate("/dashboard");

@@ -7,7 +7,8 @@ class BiometricProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = BiometricProfile
-        fields = ('user', 'age_group', 'sex', 'height', 'weight', 'bmi', 'goal', 'privacy_consent_timestamp')
+        fields = ('user', 'age_group', 'sex', 'height', 'weight', 'bmi', 'goal',
+                  'privacy_consent_timestamp', 'onboarding_complete')
         read_only_fields = ('bmi',) # BMI is strictly server-calculated
 
     def validate(self, data):
