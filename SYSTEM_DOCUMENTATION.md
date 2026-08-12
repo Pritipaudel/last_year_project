@@ -1,4 +1,4 @@
-# PoseFit — Complete System Documentation
+np# PoseFit — Complete System Documentation
 
 > **Version:** 1.0 · **Date:** August 2026 · **Stack:** Django REST Framework + React (TypeScript) + MediaPipe
 
