@@ -342,30 +342,62 @@ export function createTreePoseTracker(
       // A. Standing knee angle
       if (vis(lm[sHipIdx]) && vis(lm[sKneeIdx]) && vis(lm[sAnkleIdx])) {
         const kAngle = angle(lm[sHipIdx], lm[sKneeIdx], lm[sAnkleIdx]);
-        if (kAngle < 135) {
+        const minKnee = T?.standing_knee_min_angle ?? 150;
+        if (kAngle < minKnee) {
           errors.push('knee_bent');
         }
       }
 
       // B. Hip levelness
-      if (vis(lm[23]) && vis(lm[24])) {
+      if (vis(lm[23]) && vis(lm[24]) && vis(lm[11])) {
         const hipDiff = Math.abs(lm[23].y - lm[24].y);
-        const torsoH = Math.abs((lm[11].y - lm[23].y)) || 0.001;
-        if (hipDiff / torsoH > 0.40) errors.push('hip_unlevel');
+        const torsoH = Math.abs(lm[11].y - lm[23].y) || 0.001;
+        const hipThresh = T?.hip_levelness_threshold ?? 0.15;
+        if (hipDiff / torsoH > hipThresh) errors.push('hip_unlevel');
       }
 
       // C. Trunk sway
       if (vis(lm[11]) && vis(lm[12]) && vis(lm[sAnkleIdx])) {
         const sMidX = (lm[11].x + lm[12].x) / 2;
-        if (Math.abs(sMidX - lm[sAnkleIdx].x) > 0.35) {
+        const swayThresh = T?.trunk_sway_threshold ?? 0.10;
+        if (Math.abs(sMidX - lm[sAnkleIdx].x) > swayThresh) {
           errors.push('trunk_sway');
         }
       }
 
-      // D. Raised-foot height
-      if (vis(lm[rAnkleIdx], 0.20) && vis(lm[sAnkleIdx], 0.20)) {
-        if (lm[rAnkleIdx].y > lm[sAnkleIdx].y - 0.02) {
+      // D. Raised-foot height (dynamic by age/foot placement)
+      const targetLandmarkName = H?.foot_placement_landmark || 'ankle';
+      let minHeightY = lm[sAnkleIdx]?.y ?? 1.0;
+
+      if (targetLandmarkName === 'hip' && vis(lm[sKneeIdx], 0.20)) {
+        minHeightY = lm[sKneeIdx].y - 0.05; // well above knee
+      } else if (targetLandmarkName === 'knee' && vis(lm[sKneeIdx], 0.20)) {
+        minHeightY = lm[sKneeIdx].y + 0.05; // at/above knee
+      } else if (vis(lm[sAnkleIdx], 0.20)) {
+        minHeightY = lm[sAnkleIdx].y - 0.02; // kickstand/ankle
+      }
+
+      if (vis(lm[rAnkleIdx], 0.20)) {
+        if (lm[rAnkleIdx].y > minHeightY) {
           errors.push('foot_too_low');
+        }
+      }
+
+      // E. Arm symmetry (if required by threshold)
+      if (T?.wrist_height_symmetry_threshold != null && vis(lm[15]) && vis(lm[16])) {
+        const hDiff = Math.abs(lm[15].y - lm[16].y);
+        const torsoH = Math.abs((lm[11]?.y || 0) - (lm[23]?.y || 0)) || 0.001;
+        if (hDiff / torsoH > T.wrist_height_symmetry_threshold) {
+          errors.push('arms_asymmetric');
+        }
+      }
+
+      // F. Forward head
+      if (T?.forward_head_threshold != null && vis(lm[0]) && vis(lm[11]) && vis(lm[12])) {
+        const sMidX = (lm[11].x + lm[12].x) / 2;
+        const noseOffset = Math.abs(lm[0].x - sMidX);
+        if (noseOffset > T.forward_head_threshold) {
+          errors.push('forward_head');
         }
       }
 
@@ -386,9 +418,10 @@ export function createTreePoseTracker(
           trunk_sway: "Keep your torso vertical and centered.",
           foot_too_low: "Keep your foot placed on your calf or inner thigh.",
           arms_asymmetric: "Bring your hands together in prayer position.",
+          forward_head: "Keep your head up and look straight ahead.",
         };
 
-        for (const key of ['knee_bent', 'foot_too_low', 'trunk_sway', 'hip_unlevel']) {
+        for (const key of ['knee_bent', 'foot_too_low', 'trunk_sway', 'hip_unlevel', 'arms_asymmetric', 'forward_head']) {
           if (errors.includes(key)) {
             const cueText = DEFAULT_TREE_CUES[key] || "Adjust your posture.";
             speak(cueText, `err_${key}`, CD);

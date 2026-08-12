@@ -38,6 +38,7 @@ export interface CurlConfig {
     voice_cues: CurlVoiceCues;
     voice_cue_priority: string[];
     cue_cooldown_seconds: number;
+    age_band?: string;  // e.g. '18-25' | '26-40' | '41-60' | '60+'
 }
 
 export interface FormError {
@@ -88,6 +89,13 @@ export function createCurlTracker(
     const cues = config.voice_cues;
     const COOLDOWN_MS = (config.cue_cooldown_seconds || 8) * 1000;
     const MIN_PEAK_FRAMES = thresholds.min_peak_frames || 3;
+
+    // Age-based form tolerance: older adults have reduced shoulder/elbow mobility
+    // and a naturally wider sway arc. Tolerances scale up with age.
+    const ageBand = config.age_band || '26-40';
+    const elbowSwingTolerance = ageBand === '18-25' ? 0.10 : ageBand === '26-40' ? 0.12 : ageBand === '41-60' ? 0.15 : 0.18;  // normalised x-units
+    const shoulderRiseTolerance = ageBand === '18-25' ? 0.06 : ageBand === '26-40' ? 0.08 : ageBand === '41-60' ? 0.11 : 0.14;  // normalised y-units
+    const bodySwingTolerance = ageBand === '18-25' ? 12 : ageBand === '26-40' ? 15 : ageBand === '41-60' ? 19 : 23;    // degrees
 
     const left: ArmTracker = makeArm();
     const right: ArmTracker = makeArm();
@@ -258,9 +266,9 @@ export function createCurlTracker(
             return;
         }
 
-        // 15° delta = obvious body momentum, not just natural sway
+        // Body swing tolerance scales with age (older adults have wider natural trunk movement)
         const delta = Math.abs(trunkAngle - trunkAngleAtRepStart);
-        if (delta > 15 && !trunkSwingWarned) {
+        if (delta > bodySwingTolerance && !trunkSwingWarned) {
             fireError('body_swing', cues.body_swing, 'both');
             trunkSwingWarned = true;
             left.invalidRep = true;
@@ -276,9 +284,9 @@ export function createCurlTracker(
         if (!arm.calibrated || arm.restingElbowX === null || elbowX === null) return;
         if (arm.state === 'extended') return; // Only check during active movement
 
-        // 0.12 units (12% of normalised frame width) = obvious forward movement of elbow
+        // Elbow drift tolerance scales with age (older adults have wider natural arc)
         const drift = Math.abs(elbowX - arm.restingElbowX);
-        if (drift > 0.12) {
+        if (drift > elbowSwingTolerance) {
             fireError('elbow_swing', cues.elbow_swing, side);
             arm.invalidRep = true;
         }
@@ -293,9 +301,9 @@ export function createCurlTracker(
         if (arm.state === 'extended') return;
 
         // MediaPipe Y: 0 = top. Rising shoulder = smaller Y value.
-        // 0.08 units = obvious shrug, not just posture variation
+        // Shrug tolerance scales with age (older adults naturally elevate more under load)
         const rise = arm.restingShoulderY - shoulderY;
-        if (rise > 0.08) {
+        if (rise > shoulderRiseTolerance) {
             fireError('shoulder_elevation', cues.shoulder_elevation, side);
             arm.invalidRep = true;
         }

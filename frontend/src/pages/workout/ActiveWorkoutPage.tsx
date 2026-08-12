@@ -243,7 +243,10 @@ export function ActiveWorkoutPage() {
 
     if (isCurl && !curlTrackerRef.current) {
       curlTrackerRef.current = createCurlTracker(
-        exercise.personalization as any,
+        {
+          ...(exercise.personalization as any),
+          age_band: exercise.personalization?.age_band,
+        },
         speak,
         (errorType: string, timestampSeconds: number) => {
           sessionErrors.current.push({ error_type: errorType, timestamp: String(timestampSeconds) });
@@ -488,8 +491,8 @@ export function ActiveWorkoutPage() {
           if (spineAngle !== null && spineAngle > 30) {
             squatPosture = { status: 'check', message: 'KEEP CHEST UP' };
           } else {
-            const bottomMax = (thresholds as any).bottom_max ?? 105;
-            if (angle < bottomMax) {
+            const tooDeep = (thresholds as any).too_deep_threshold ?? 50;
+            if (angle < tooDeep) {
               squatPosture = { status: 'check', message: 'TOO DEEP' };
             }
           }
@@ -518,12 +521,12 @@ export function ActiveWorkoutPage() {
           repState.current = 'bottom';
           reachedBottom.current = true;
           speakImmediate("Good depth!");
-        } else if (angle > minAngleInRep.current + 30) {
+        } else if (angle > minAngleInRep.current + 15) {
           repState.current = 'ascending';
         }
       } else if (repState.current === 'bottom') {
         if (angle < minAngleInRep.current) minAngleInRep.current = angle;
-        if (angle > minAngleInRep.current + 30) repState.current = 'ascending';
+        if (angle > minAngleInRep.current + 15) repState.current = 'ascending';
       } else if (repState.current === 'ascending') {
         if (angle > completeTrigger) {
           if (reachedBottom.current) {
