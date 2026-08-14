@@ -1,9 +1,9 @@
-import { 
-  Home, 
-  Dumbbell, 
-  Stethoscope, 
-  History, 
-  User 
+import {
+  Home,
+  Dumbbell,
+  Stethoscope,
+  History,
+  User
 } from "lucide-react";
 
 export const NAVIGATION_ITEMS = [

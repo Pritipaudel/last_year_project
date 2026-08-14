@@ -1,8 +1,8 @@
 """
 management/commands/seed_voice_cue_audio.py
 
-Pre-renders every string in Exercise.voice_cues to a wav file using the WiseYak
-TTS service and records the resulting media URLs in Exercise.voice_cue_audio.
+Pre-renders every string in Exercise.voice_cues to a wav file using Google TTS (gTTS)
+and records the resulting media URLs in Exercise.voice_cue_audio.
 
 The frontend plays the pre-rendered clip when one exists for a cue and falls
 back to live Web Speech synthesis when it does not, so this command is purely
@@ -20,10 +20,6 @@ Usage:
 """
 
 import hashlib
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,17 +27,6 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from exercise.constants import (
-    TTS_AUDIO_SPEED,
-    TTS_BASE_URL,
-    TTS_GENERATE_PATH,
-    TTS_LANGUAGE,
-    TTS_MAX_ATTEMPTS,
-    TTS_MODEL,
-    TTS_REFERENCE_AUDIO_ID,
-    TTS_REQUEST_TIMEOUT_SECONDS,
-    TTS_RETRY_BACKOFF_SECONDS,
-    TTS_TARGET_SAMPLE_RATE,
-    TTSOutputType,
     VOICE_CUE_AUDIO_EXTENSION,
     VOICE_CUE_AUDIO_SUBDIR,
     VOICE_CUE_CACHE_KEY_LENGTH,
@@ -56,12 +41,7 @@ class VoiceProfile:
     Any change to these fields changes the cache key, so a new voice or speed
     produces new files instead of silently reusing the old ones.
     """
-
-    language: str = TTS_LANGUAGE
-    model: str = str(TTS_MODEL)
-    reference_audio_id: str = TTS_REFERENCE_AUDIO_ID
-    audio_speed: float = TTS_AUDIO_SPEED
-    target_sample_rate: int = TTS_TARGET_SAMPLE_RATE
+    language: str = "en"
 
 
 @dataclass(frozen=True)
@@ -75,22 +55,9 @@ class CueRef:
 
 
 def _cache_key(text: str, profile: VoiceProfile) -> str:
-    """Return the content-addressed stem for a clip.
-
-    Inputs: cue text and the voice parameters it will be rendered with.
-    Output: a short hex digest used as the wav filename stem.
-    """
+    """Return the content-addressed stem for a clip."""
     return hashlib.sha256(
-        "|".join(
-            (
-                text,
-                profile.language,
-                profile.model,
-                profile.reference_audio_id,
-                str(profile.audio_speed),
-                str(profile.target_sample_rate),
-            )
-        ).encode("utf-8")
+        "|".join((text, profile.language)).encode("utf-8")
     ).hexdigest()[:VOICE_CUE_CACHE_KEY_LENGTH]
 
 
@@ -104,51 +71,15 @@ def _synthesize_gtts(text: str) -> bytes:
 
 
 def _synthesize(text: str, profile: VoiceProfile) -> bytes:
-    """Call the TTS service and return raw audio bytes.
-
-    Inputs: the cue text and the voice profile to render it with.
-    Output: audio bytes.
-    Retries transient failures with WiseYak, falling back to gTTS if unreachable.
-    """
-    payload = urllib.parse.urlencode(
-        {
-            "text": text,
-            "language": profile.language,
-            "output_type": str(TTSOutputType.AUDIO),
-            "audio_speed": profile.audio_speed,
-            "reference_audio_id": profile.reference_audio_id,
-            "target_sample_rate": profile.target_sample_rate,
-            "model": profile.model,
-        }
-    ).encode("utf-8")
-
-    last_error: Exception | None = None
-    for attempt in range(1, TTS_MAX_ATTEMPTS + 1):
-        try:
-            request = urllib.request.Request(
-                f"{TTS_BASE_URL}{TTS_GENERATE_PATH}",
-                data=payload,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=3) as response:
-                return response.read()
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
-            last_error = exc
-
+    """Call Google TTS and return raw audio bytes."""
     try:
         return _synthesize_gtts(text)
     except Exception as exc:
-        raise CommandError(f"TTS failed after {TTS_MAX_ATTEMPTS} attempts for {text!r}: {last_error}") from exc
-
+        raise CommandError(f"gTTS failed for {text!r}: {exc}") from exc
 
 
 def _collect_cues(exercises: list[Exercise]) -> tuple[CueRef, ...]:
-    """Flatten the nested voice_cues structure into a tuple of cue references.
-
-    Inputs: the exercises to seed audio for.
-    Output: one CueRef per non-empty cue string across every age band.
-    """
+    """Flatten the nested voice_cues structure into a tuple of cue references."""
     return tuple(
         CueRef(exercise.name, band, cue_key, text)
         for exercise in exercises
@@ -159,7 +90,7 @@ def _collect_cues(exercises: list[Exercise]) -> tuple[CueRef, ...]:
 
 
 class Command(BaseCommand):
-    help = "Pre-renders Exercise.voice_cues to wav files via the TTS service and stores their URLs."
+    help = "Pre-renders Exercise.voice_cues to wav files via Google TTS and stores their URLs."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -187,7 +118,7 @@ class Command(BaseCommand):
             raise CommandError("No matching exercises found — run seed_exercises first.")
 
         cues = _collect_cues(exercises)
-        self.stdout.write(f"Rendering {len(cues)} cues from {len(exercises)} exercise(s) via {TTS_BASE_URL}")
+        self.stdout.write(f"Rendering {len(cues)} cues from {len(exercises)} exercise(s) via Google TTS (gTTS)")
 
         urls_by_exercise: dict[str, dict[str, dict[str, str]]] = {}
         synthesized = 0

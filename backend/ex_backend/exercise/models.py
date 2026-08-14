@@ -130,41 +130,4 @@ class ExerciseLog(models.Model):
     def __str__(self):
         return f"{self.exercise.name} Log - {self.session.id}"
 
-class Doctor(models.Model):
-    """
-    Specialist profiles for consultation.
-    """
-    name = models.CharField(max_length=255)
-    specialty = models.CharField(max_length=100, db_index=True)
-    rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.0)
-    distance_km = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    image_url = models.URLField()
-    is_available = models.BooleanField(default=True)
 
-    def __str__(self):
-        return self.name
-
-class Consultation(models.Model):
-    """
-    User consultation requests with specialists.
-    """
-    STATUS_CHOICES = [
-        ('Scheduled', 'Scheduled'),
-        ('Completed', 'Completed'),
-        ('Cancelled', 'Cancelled'),
-    ]
-    
-    TYPE_CHOICES = [
-        ('Call', 'Call'),
-        ('Video', 'Consult'),
-    ]
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consultations')
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='appointments')
-    consultation_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Scheduled')
-    scheduled_at = models.DateTimeField(db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.username} w/ {self.doctor.name} ({self.status})"
